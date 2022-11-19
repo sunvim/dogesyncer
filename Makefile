@@ -19,11 +19,11 @@ build:
 
 .PHONY: race
 race:
-	go run -race main.go --config .doge.yaml 
+	go run -race main.go server --config .doge.yaml 
 
 .PHONY: start 
-start: compile
-	bin/doge --config .doge.yaml 
+start: build
+	bin/doge server --config .doge.yaml 
 
 
 .PHONY: docker
