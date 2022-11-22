@@ -94,7 +94,7 @@ type Trie struct {
 	state   *State
 	root    Node
 	epoch   uint32
-	storage ethdb.Database
+	storage Storage
 }
 
 func NewTrie() *Trie {
@@ -252,7 +252,7 @@ func (t *Trie) Txn() *Txn {
 type Txn struct {
 	root    Node
 	epoch   uint32
-	storage ethdb.Database
+	storage Storage
 	batch   ethdb.Setter
 }
 

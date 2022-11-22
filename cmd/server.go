@@ -18,25 +18,19 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-	"github.com/sunvim/dogesyncer/params"
 	"github.com/sunvim/dogesyncer/pkg/server"
 )
 
 // serverCmd represents the server command
 var serverCmd = &cobra.Command{
-	Use:   "server",
-	Short: "main service entry",
-	Long:  ``,
-	Run:   server.Run,
+	Use:     "server",
+	Short:   "main service entry",
+	Long:    ``,
+	PreRunE: server.PreRun,
+	Run:     server.Run,
 }
 
 func init() {
 	rootCmd.AddCommand(serverCmd)
-
-	serverCmd.Flags().StringP(params.ArgGenesis, "g", "", "genesis file,shouldn't null")
-	serverCmd.Flags().StringP(params.ArgDatadir, "d", "", "data directory path")
-
-	viper.BindPFlag(params.ArgGenesis, serverCmd.Flags().Lookup(params.ArgGenesis))
-	viper.BindPFlag(params.ArgDatadir, serverCmd.Flags().Lookup(params.ArgDatadir))
+	server.SetFlags(serverCmd)
 }

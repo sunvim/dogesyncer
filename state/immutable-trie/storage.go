@@ -16,6 +16,52 @@ var (
 	codePrefix = []byte("code")
 )
 
+type Storage interface {
+	Set(k, v []byte) error
+	Get(k []byte) ([]byte, bool, error)
+
+	SetCode(hash types.Hash, code []byte) error
+	GetCode(hash types.Hash) ([]byte, bool)
+	Close() error
+
+	Batch() ethdb.Batch
+}
+
+type KVStorage struct {
+	db ethdb.Database
+}
+
+func NewKVStorage(db ethdb.Database) Storage {
+	return &KVStorage{db}
+}
+func (kv *KVStorage) Set(k []byte, v []byte) error {
+	return kv.db.Set(ethdb.TrieDBI, k, v)
+}
+
+func (kv *KVStorage) Get(k []byte) ([]byte, bool, error) {
+	return kv.db.Get(ethdb.TrieDBI, k)
+}
+
+func (kv *KVStorage) Close() error {
+	return kv.db.Close()
+}
+
+func (kv *KVStorage) Batch() ethdb.Batch {
+	return kv.db.Batch()
+}
+
+func (kv *KVStorage) SetCode(hash types.Hash, code []byte) error {
+	return kv.db.Set(ethdb.TrieDBI, append(codePrefix, hash.Bytes()...), code)
+}
+
+func (kv *KVStorage) GetCode(hash types.Hash) ([]byte, bool) {
+	rs, ok, _ := kv.db.Get(ethdb.TrieDBI, append(codePrefix, hash.Bytes()...))
+	if !ok {
+		return []byte{}, false
+	}
+	return rs, ok
+}
+
 type memStorage struct {
 	db   map[string][]byte
 	code map[string][]byte
@@ -26,11 +72,11 @@ type memBatch struct {
 }
 
 // NewMemoryStorage creates an inmemory trie storage
-func NewMemoryStorage() ethdb.Database {
+func NewMemoryStorage() Storage {
 	return &memStorage{db: map[string][]byte{}, code: map[string][]byte{}}
 }
 
-func (m *memStorage) Set(dbi string, p []byte, v []byte) error {
+func (m *memStorage) Set(p []byte, v []byte) error {
 	buf := make([]byte, len(v))
 	copy(buf[:], v[:])
 	m.db[hex.EncodeToHex(p)] = buf
@@ -38,7 +84,7 @@ func (m *memStorage) Set(dbi string, p []byte, v []byte) error {
 	return nil
 }
 
-func (m *memStorage) Get(dbi string, p []byte) ([]byte, bool, error) {
+func (m *memStorage) Get(p []byte) ([]byte, bool, error) {
 	v, ok := m.db[hex.EncodeToHex(p)]
 	if !ok {
 		return []byte{}, false, nil
@@ -79,8 +125,8 @@ func (m *memBatch) Write() error {
 }
 
 // GetNode retrieves a node from storage
-func GetNode(root []byte, storage ethdb.Database) (Node, bool, error) {
-	data, ok, _ := storage.Get(ethdb.TrieDBI, root)
+func GetNode(root []byte, storage Storage) (Node, bool, error) {
+	data, ok, _ := storage.Get(root)
 	if !ok {
 		return nil, false, nil
 	}
@@ -104,7 +150,7 @@ func GetNode(root []byte, storage ethdb.Database) (Node, bool, error) {
 	return n, err == nil, err
 }
 
-func decodeNode(v *fastrlp.Value, s ethdb.Database) (Node, error) {
+func decodeNode(v *fastrlp.Value, s Storage) (Node, error) {
 	if v.Type() == fastrlp.TypeBytes {
 		vv := &ValueNode{
 			hash: true,

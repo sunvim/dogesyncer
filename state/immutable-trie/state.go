@@ -6,7 +6,6 @@ import (
 
 	lru "github.com/hashicorp/golang-lru"
 
-	"github.com/sunvim/dogesyncer/ethdb"
 	"github.com/sunvim/dogesyncer/state"
 	"github.com/sunvim/dogesyncer/types"
 )
@@ -18,7 +17,7 @@ const (
 )
 
 type State struct {
-	storage ethdb.Database
+	storage Storage
 
 	codeLruCache      *lru.Cache
 	trieStateCache    *lru.Cache
@@ -27,7 +26,7 @@ type State struct {
 	metrics *Metrics
 }
 
-func NewState(storage ethdb.Database, metrics *Metrics) *State {
+func NewState(storage Storage, metrics *Metrics) *State {
 	codeLruCache, _ := lru.New(codeLruCacheSize)
 	trieStateCache, _ := lru.New(trieStateLruCacheSize)
 	accountStateCache, _ := lru.New(accountStateLruCacheSize)
@@ -52,7 +51,7 @@ func (s *State) NewSnapshot() state.Snapshot {
 }
 
 func (s *State) SetCode(hash types.Hash, code []byte) error {
-	err := s.storage.Set(ethdb.TrieDBI, append(codePrefix, hash.Bytes()...), code)
+	err := s.storage.SetCode(hash, code)
 
 	if err != nil {
 		return err
@@ -79,7 +78,7 @@ func (s *State) GetCode(hash types.Hash) ([]byte, bool) {
 
 	s.metrics.CodeLruCacheMiss.Add(1)
 
-	code, ok, _ := s.storage.Get(ethdb.TrieDBI, append(codePrefix, hash.Bytes()...))
+	code, ok := s.storage.GetCode(hash)
 	if ok {
 		s.codeLruCache.Add(hash, code)
 
