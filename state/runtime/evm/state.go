@@ -8,10 +8,10 @@ import (
 
 	"sync"
 
-	"github.com/dogechain-lab/dogechain/chain"
-	"github.com/dogechain-lab/dogechain/helper/hex"
-	"github.com/dogechain-lab/dogechain/state/runtime"
-	"github.com/dogechain-lab/dogechain/types"
+	"github.com/sunvim/dogesyncer/chain"
+	"github.com/sunvim/dogesyncer/helper/hex"
+	"github.com/sunvim/dogesyncer/state/runtime"
+	"github.com/sunvim/dogesyncer/types"
 )
 
 var statePool = sync.Pool{

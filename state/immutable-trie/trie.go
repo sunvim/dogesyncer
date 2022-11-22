@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/dogechain-lab/dogechain/state"
-	"github.com/dogechain-lab/dogechain/types"
 	"github.com/dogechain-lab/fastrlp"
+	"github.com/sunvim/dogesyncer/ethdb"
+	"github.com/sunvim/dogesyncer/state"
+	"github.com/sunvim/dogesyncer/types"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -93,7 +94,7 @@ type Trie struct {
 	state   *State
 	root    Node
 	epoch   uint32
-	storage Storage
+	storage ethdb.Database
 }
 
 func NewTrie() *Trie {
@@ -248,15 +249,11 @@ func (t *Trie) Txn() *Txn {
 	return &Txn{root: t.root, epoch: t.epoch + 1, storage: t.storage}
 }
 
-type Putter interface {
-	Set(k, v []byte)
-}
-
 type Txn struct {
 	root    Node
 	epoch   uint32
-	storage Storage
-	batch   Putter
+	storage ethdb.Database
+	batch   ethdb.Setter
 }
 
 func (t *Txn) Commit() *Trie {

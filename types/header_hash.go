@@ -1,8 +1,8 @@
 package types
 
 import (
-	"github.com/dogechain-lab/dogechain/helper/keccak"
 	"github.com/dogechain-lab/fastrlp"
+	"github.com/sunvim/dogesyncer/helper/keccak"
 )
 
 var HeaderHash func(h *Header) Hash

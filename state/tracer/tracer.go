@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/dogechain-lab/dogechain/state/runtime"
-	"github.com/dogechain-lab/dogechain/types"
+	"github.com/sunvim/dogesyncer/state/runtime"
+	"github.com/sunvim/dogesyncer/types"
 )
 
 // Context contains some contextual infos for a transaction execution that is not

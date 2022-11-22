@@ -3,7 +3,7 @@ package evm
 import (
 	"fmt"
 
-	"github.com/dogechain-lab/dogechain/state/runtime"
+	"github.com/sunvim/dogesyncer/state/runtime"
 )
 
 // OpCode is the EVM operation code

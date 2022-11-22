@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dogechain-lab/dogechain/helper/hex"
+	"github.com/sunvim/dogesyncer/helper/hex"
 )
 
 var (

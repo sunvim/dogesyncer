@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dogechain-lab/dogechain/types"
+	"github.com/sunvim/dogesyncer/types"
 )
 
 var addr1 = types.StringToAddress("1")

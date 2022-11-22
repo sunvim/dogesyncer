@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/dogechain-lab/dogechain/network/event"
-	"github.com/dogechain-lab/dogechain/network/proto"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/sunvim/dogesyncer/network/event"
+	"github.com/sunvim/dogesyncer/network/proto"
 	"google.golang.org/grpc"
 )
 

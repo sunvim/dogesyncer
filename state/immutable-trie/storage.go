@@ -3,10 +3,10 @@ package itrie
 import (
 	"fmt"
 
-	"github.com/dogechain-lab/dogechain/helper/hex"
-	"github.com/dogechain-lab/dogechain/types"
 	"github.com/dogechain-lab/fastrlp"
-	"github.com/hashicorp/go-hclog"
+	"github.com/sunvim/dogesyncer/ethdb"
+	"github.com/sunvim/dogesyncer/helper/hex"
+	"github.com/sunvim/dogesyncer/types"
 )
 
 var parserPool fastrlp.ParserPool
@@ -15,91 +15,6 @@ var (
 	// codePrefix is the code prefix for leveldb
 	codePrefix = []byte("code")
 )
-
-type Batch interface {
-	Set(k, v []byte)
-	Write() error
-}
-
-// Storage stores the trie
-type Storage interface {
-	Set(k, v []byte) error
-	Get(k []byte) ([]byte, bool, error)
-
-	SetCode(hash types.Hash, code []byte) error
-	GetCode(hash types.Hash) ([]byte, bool)
-
-	Batch() Batch
-
-	Close() error
-}
-
-type KVStorage struct {
-}
-
-type keyvalue struct {
-	key    []byte
-	value  []byte
-	delete bool
-}
-
-// KVBatch is a batch write for leveldb
-type KVBatch struct {
-	writes []keyvalue
-	size   int
-}
-
-func copyBytes(b []byte) (copiedBytes []byte) {
-	if b == nil {
-		return nil
-	}
-	copiedBytes = make([]byte, len(b))
-	copy(copiedBytes, b)
-
-	return
-}
-
-func (b *KVBatch) Set(k, v []byte) {
-	b.writes = append(b.writes, keyvalue{copyBytes(k), copyBytes(v), false})
-	b.size += len(k) + len(v)
-}
-
-// why no error handle
-func (b *KVBatch) Write() error {
-	return nil
-}
-
-func (kv *KVStorage) SetCode(hash types.Hash, code []byte) error {
-	return kv.Set(append(codePrefix, hash.Bytes()...), code)
-}
-
-func (kv *KVStorage) GetCode(hash types.Hash) ([]byte, bool) {
-	rs, ok, _ := kv.Get(append(codePrefix, hash.Bytes()...))
-	if !ok {
-		return []byte{}, false
-	}
-	return rs, ok
-}
-
-func (kv *KVStorage) Batch() Batch {
-	return nil
-}
-
-func (kv *KVStorage) Set(k, v []byte) error {
-	return nil
-}
-
-func (kv *KVStorage) Get(k []byte) ([]byte, bool, error) {
-	return nil, true, nil
-}
-
-func (kv *KVStorage) Close() error {
-	return nil
-}
-
-func NewMDBXStorage(logger hclog.Logger, path string) (Storage, error) {
-	return nil, nil
-}
 
 type memStorage struct {
 	db   map[string][]byte
@@ -111,11 +26,11 @@ type memBatch struct {
 }
 
 // NewMemoryStorage creates an inmemory trie storage
-func NewMemoryStorage() Storage {
+func NewMemoryStorage() ethdb.Database {
 	return &memStorage{db: map[string][]byte{}, code: map[string][]byte{}}
 }
 
-func (m *memStorage) Set(p []byte, v []byte) error {
+func (m *memStorage) Set(dbi string, p []byte, v []byte) error {
 	buf := make([]byte, len(v))
 	copy(buf[:], v[:])
 	m.db[hex.EncodeToHex(p)] = buf
@@ -123,7 +38,7 @@ func (m *memStorage) Set(p []byte, v []byte) error {
 	return nil
 }
 
-func (m *memStorage) Get(p []byte) ([]byte, bool, error) {
+func (m *memStorage) Get(dbi string, p []byte) ([]byte, bool, error) {
 	v, ok := m.db[hex.EncodeToHex(p)]
 	if !ok {
 		return []byte{}, false, nil
@@ -144,7 +59,7 @@ func (m *memStorage) GetCode(hash types.Hash) ([]byte, bool) {
 	return code, ok
 }
 
-func (m *memStorage) Batch() Batch {
+func (m *memStorage) Batch() ethdb.Batch {
 	return &memBatch{db: &m.db}
 }
 
@@ -152,10 +67,11 @@ func (m *memStorage) Close() error {
 	return nil
 }
 
-func (m *memBatch) Set(p, v []byte) {
+func (m *memBatch) Set(dbi string, p, v []byte) error {
 	buf := make([]byte, len(v))
 	copy(buf[:], v[:])
 	(*m.db)[hex.EncodeToHex(p)] = buf
+	return nil
 }
 
 func (m *memBatch) Write() error {
@@ -163,8 +79,8 @@ func (m *memBatch) Write() error {
 }
 
 // GetNode retrieves a node from storage
-func GetNode(root []byte, storage Storage) (Node, bool, error) {
-	data, ok, _ := storage.Get(root)
+func GetNode(root []byte, storage ethdb.Database) (Node, bool, error) {
+	data, ok, _ := storage.Get(ethdb.TrieDBI, root)
 	if !ok {
 		return nil, false, nil
 	}
@@ -188,7 +104,7 @@ func GetNode(root []byte, storage Storage) (Node, bool, error) {
 	return n, err == nil, err
 }
 
-func decodeNode(v *fastrlp.Value, s Storage) (Node, error) {
+func decodeNode(v *fastrlp.Value, s ethdb.Database) (Node, error) {
 	if v.Type() == fastrlp.TypeBytes {
 		vv := &ValueNode{
 			hash: true,

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/dogechain-lab/dogechain/helper/hex"
+	"github.com/sunvim/dogesyncer/helper/hex"
 )
 
 // Header represents a block header in the Ethereum blockchain.

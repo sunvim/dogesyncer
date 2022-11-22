@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cornelk/hashmap"
 	"github.com/libp2p/go-libp2p"
 	noise "github.com/libp2p/go-libp2p-noise"
 	"github.com/sunvim/dogesyncer/network/common"
@@ -24,7 +25,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/protocol"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/multiformats/go-multiaddr"
-	cmap "github.com/sunvim/dogesyncer/helper/concurrentmap"
 	peerEvent "github.com/sunvim/dogesyncer/network/event"
 	"github.com/sunvim/dogesyncer/secrets"
 )
@@ -85,7 +85,7 @@ type Server struct {
 
 	connectionCounts *ConnectionInfo
 
-	temporaryDials cmap.ConcurrentMap // map of temporary connections; peerID -> bool
+	temporaryDials *hashmap.Map[peer.ID, bool] // map of temporary connections; peerID -> bool
 
 	bootnodes *bootnodesWrapper // reference of all bootnodes for the node
 }
@@ -158,7 +158,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 			config.MaxInboundPeers,
 			config.MaxOutboundPeers,
 		),
-		temporaryDials: cmap.NewConcurrentMap(),
+		temporaryDials: hashmap.New[peer.ID, bool](),
 	}
 
 	// start gossip protocol

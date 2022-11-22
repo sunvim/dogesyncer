@@ -4,11 +4,11 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/dogechain-lab/dogechain/chain"
-	"github.com/dogechain-lab/dogechain/crypto"
-	"github.com/dogechain-lab/dogechain/state/runtime"
-	"github.com/dogechain-lab/dogechain/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/sunvim/dogesyncer/chain"
+	"github.com/sunvim/dogesyncer/crypto"
+	"github.com/sunvim/dogesyncer/state/runtime"
+	"github.com/sunvim/dogesyncer/types"
 )
 
 var (

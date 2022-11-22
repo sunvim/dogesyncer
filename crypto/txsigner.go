@@ -7,8 +7,8 @@ import (
 	"math/bits"
 
 	"github.com/dogechain-lab/fastrlp"
+	"github.com/sunvim/dogesyncer/chain"
 	"github.com/sunvim/dogesyncer/helper/keccak"
-	"github.com/sunvim/dogesyncer/params"
 	"github.com/sunvim/dogesyncer/types"
 )
 
@@ -28,7 +28,7 @@ type TxSigner interface {
 }
 
 // NewSigner creates a new signer object (EIP155 or FrontierSigner)
-func NewSigner(forks params.ForksInTime, chainID uint64) TxSigner {
+func NewSigner(forks chain.ForksInTime, chainID uint64) TxSigner {
 	var signer TxSigner
 
 	if forks.EIP155 {

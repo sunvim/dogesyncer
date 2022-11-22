@@ -7,8 +7,8 @@ import (
 
 	goHex "encoding/hex"
 
-	"github.com/dogechain-lab/dogechain/helper/hex"
-	"github.com/dogechain-lab/dogechain/helper/keccak"
+	"github.com/sunvim/dogesyncer/helper/hex"
+	"github.com/sunvim/dogesyncer/helper/keccak"
 )
 
 type ReceiptStatus uint64

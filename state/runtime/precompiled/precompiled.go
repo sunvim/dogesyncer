@@ -3,7 +3,7 @@ package precompiled
 import (
 	"encoding/binary"
 
-	"github.com/sunvim/dogesyncer/params"
+	"github.com/sunvim/dogesyncer/chain"
 	"github.com/sunvim/dogesyncer/state/runtime"
 	"github.com/sunvim/dogesyncer/types"
 )
@@ -11,7 +11,7 @@ import (
 var _ runtime.Runtime = &Precompiled{}
 
 type contract interface {
-	gas(input []byte, config *params.ForksInTime) uint64
+	gas(input []byte, config *chain.ForksInTime) uint64
 	run(input []byte) ([]byte, error)
 }
 
@@ -62,7 +62,7 @@ var (
 )
 
 // CanRun implements the runtime interface
-func (p *Precompiled) CanRun(c *runtime.Contract, _ runtime.Host, config *params.ForksInTime) bool {
+func (p *Precompiled) CanRun(c *runtime.Contract, _ runtime.Host, config *chain.ForksInTime) bool {
 	if _, ok := p.contracts[c.CodeAddress]; !ok {
 		return false
 	}
@@ -94,7 +94,7 @@ func (p *Precompiled) Name() string {
 }
 
 // Run runs an execution
-func (p *Precompiled) Run(c *runtime.Contract, _ runtime.Host, config *params.ForksInTime) *runtime.ExecutionResult {
+func (p *Precompiled) Run(c *runtime.Contract, _ runtime.Host, config *chain.ForksInTime) *runtime.ExecutionResult {
 	contract := p.contracts[c.CodeAddress]
 	gasCost := contract.gas(c.Input, config)
 

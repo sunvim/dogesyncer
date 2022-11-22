@@ -1,9 +1,9 @@
 package buildroot
 
 import (
-	itrie "github.com/dogechain-lab/dogechain/state/immutable-trie"
 	"github.com/dogechain-lab/fastrlp"
 	"github.com/sunvim/dogesyncer/helper/keccak"
+	itrie "github.com/sunvim/dogesyncer/state/immutable-trie"
 	"github.com/sunvim/dogesyncer/types"
 )
 

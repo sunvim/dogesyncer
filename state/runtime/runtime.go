@@ -4,7 +4,7 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/sunvim/dogesyncer/params"
+	"github.com/sunvim/dogesyncer/chain"
 	"github.com/sunvim/dogesyncer/types"
 )
 
@@ -57,7 +57,7 @@ func (s StorageStatus) String() string {
 type Host interface {
 	AccountExists(addr types.Address) bool
 	GetStorage(addr types.Address, key types.Hash) types.Hash
-	SetStorage(addr types.Address, key types.Hash, value types.Hash, config *params.ForksInTime) StorageStatus
+	SetStorage(addr types.Address, key types.Hash, value types.Hash, config *chain.ForksInTime) StorageStatus
 	GetBalance(addr types.Address) *big.Int
 	GetCodeSize(addr types.Address) int
 	GetCodeHash(addr types.Address) types.Hash
@@ -162,8 +162,8 @@ func IsCallType(typ CallType) bool {
 
 // Runtime can process contracts
 type Runtime interface {
-	Run(c *Contract, host Host, config *params.ForksInTime) *ExecutionResult
-	CanRun(c *Contract, host Host, config *params.ForksInTime) bool
+	Run(c *Contract, host Host, config *chain.ForksInTime) *ExecutionResult
+	CanRun(c *Contract, host Host, config *chain.ForksInTime) bool
 	Name() string
 }
 

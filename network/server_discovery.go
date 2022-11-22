@@ -176,14 +176,13 @@ func (s *Server) GetRandomPeer() *peer.ID {
 // FetchOrSetTemporaryDial loads the temporary status of a peer connection, and
 // sets a new value [Thread safe]
 func (s *Server) FetchOrSetTemporaryDial(peerID peer.ID, newValue bool) bool {
-	_, loaded := s.temporaryDials.LoadOrStore(peerID, newValue)
-
+	_, loaded := s.temporaryDials.GetOrInsert(peerID, newValue)
 	return loaded
 }
 
 // RemoveTemporaryDial removes a peer connection as temporary [Thread safe]
 func (s *Server) RemoveTemporaryDial(peerID peer.ID) {
-	s.temporaryDials.Delete(peerID)
+	s.temporaryDials.Del(peerID)
 }
 
 // setupDiscovery Sets up the discovery service for the node

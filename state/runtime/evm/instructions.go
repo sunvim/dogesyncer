@@ -8,10 +8,10 @@ import (
 	"math/bits"
 	"sync"
 
-	"github.com/dogechain-lab/dogechain/crypto"
-	"github.com/dogechain-lab/dogechain/helper/keccak"
-	"github.com/dogechain-lab/dogechain/state/runtime"
-	"github.com/dogechain-lab/dogechain/types"
+	"github.com/sunvim/dogesyncer/crypto"
+	"github.com/sunvim/dogesyncer/helper/keccak"
+	"github.com/sunvim/dogesyncer/state/runtime"
+	"github.com/sunvim/dogesyncer/types"
 )
 
 type instruction func(c *state)

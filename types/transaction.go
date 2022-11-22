@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/dogechain-lab/dogechain/helper/keccak"
+	"github.com/sunvim/dogesyncer/helper/keccak"
 )
 
 type Transaction struct {

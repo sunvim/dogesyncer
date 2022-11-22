@@ -4,7 +4,7 @@ import (
 	"net"
 
 	"github.com/multiformats/go-multiaddr"
-	"github.com/sunvim/dogesyncer/params"
+	"github.com/sunvim/dogesyncer/chain"
 	"github.com/sunvim/dogesyncer/secrets"
 )
 
@@ -18,7 +18,7 @@ type Config struct {
 	MaxPeers         int64                  // the maximum number of peer connections
 	MaxInboundPeers  int64                  // the maximum number of inbound peer connections
 	MaxOutboundPeers int64                  // the maximum number of outbound peer connections
-	Chain            *params.Chain          // the reference to the chain configuration
+	Chain            *chain.Chain           // the reference to the chain configuration
 	SecretsManager   secrets.SecretsManager // the secrets manager used for key storage
 	Metrics          *Metrics               // the metrics reporting reference
 }

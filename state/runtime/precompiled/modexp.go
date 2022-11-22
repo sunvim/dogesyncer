@@ -5,7 +5,7 @@ import (
 
 	"math"
 
-	"github.com/sunvim/dogesyncer/params"
+	"github.com/sunvim/dogesyncer/chain"
 )
 
 type modExp struct {
@@ -78,7 +78,7 @@ func multComplexity(x *big.Int) *big.Int {
 	return x
 }
 
-func (m *modExp) gas(input []byte, config *params.ForksInTime) uint64 {
+func (m *modExp) gas(input []byte, config *chain.ForksInTime) uint64 {
 	var val, tail []byte
 
 	val, tail = m.p.get(input, 32)

@@ -7,10 +7,10 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/dogechain-lab/dogechain/helper/hex"
-	"github.com/dogechain-lab/dogechain/types"
 	"github.com/dogechain-lab/fastrlp"
 	"github.com/stretchr/testify/assert"
+	"github.com/sunvim/dogesyncer/helper/hex"
+	"github.com/sunvim/dogesyncer/types"
 	"golang.org/x/crypto/sha3"
 )
 

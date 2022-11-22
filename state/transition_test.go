@@ -4,10 +4,10 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/dogechain-lab/dogechain/state/runtime"
-	"github.com/dogechain-lab/dogechain/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
+	"github.com/sunvim/dogesyncer/state/runtime"
+	"github.com/sunvim/dogesyncer/types"
 )
 
 func newTestTransition(preState map[types.Address]*PreState) *Transition {

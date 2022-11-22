@@ -8,9 +8,9 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/dogechain-lab/dogechain/state/runtime"
-	"github.com/dogechain-lab/dogechain/state/runtime/evm"
-	"github.com/dogechain-lab/dogechain/types"
+	"github.com/sunvim/dogesyncer/state/runtime"
+	"github.com/sunvim/dogesyncer/state/runtime/evm"
+	"github.com/sunvim/dogesyncer/types"
 )
 
 // Storage represents a contract's storage.

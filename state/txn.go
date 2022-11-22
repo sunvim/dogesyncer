@@ -5,11 +5,11 @@ import (
 
 	iradix "github.com/hashicorp/go-immutable-radix"
 
-	"github.com/dogechain-lab/dogechain/chain"
-	"github.com/dogechain-lab/dogechain/crypto"
-	"github.com/dogechain-lab/dogechain/helper/keccak"
-	"github.com/dogechain-lab/dogechain/state/runtime"
-	"github.com/dogechain-lab/dogechain/types"
+	"github.com/sunvim/dogesyncer/chain"
+	"github.com/sunvim/dogesyncer/crypto"
+	"github.com/sunvim/dogesyncer/helper/keccak"
+	"github.com/sunvim/dogesyncer/state/runtime"
+	"github.com/sunvim/dogesyncer/types"
 )
 
 var emptyStateHash = types.StringToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")

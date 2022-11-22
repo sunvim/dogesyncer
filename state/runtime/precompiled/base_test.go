@@ -3,8 +3,8 @@ package precompiled
 import (
 	"testing"
 
-	"github.com/dogechain-lab/dogechain/helper/hex"
 	"github.com/stretchr/testify/assert"
+	"github.com/sunvim/dogesyncer/helper/hex"
 )
 
 type precompiledTest struct {

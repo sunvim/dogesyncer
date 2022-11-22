@@ -3,8 +3,8 @@ package evm
 import (
 	"errors"
 
-	"github.com/dogechain-lab/dogechain/chain"
-	"github.com/dogechain-lab/dogechain/state/runtime"
+	"github.com/sunvim/dogesyncer/chain"
+	"github.com/sunvim/dogesyncer/state/runtime"
 )
 
 // runtime interface compatible

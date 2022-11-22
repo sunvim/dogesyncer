@@ -6,8 +6,9 @@ import (
 	"hash"
 	"sync"
 
-	"github.com/dogechain-lab/dogechain/types"
 	"github.com/dogechain-lab/fastrlp"
+	"github.com/sunvim/dogesyncer/ethdb"
+	"github.com/sunvim/dogesyncer/types"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -109,7 +110,7 @@ func (t *Txn) Hash() ([]byte, error) {
 			root = h.hash.Sum(nil)
 
 			if t.batch != nil {
-				t.batch.Set(root, val.Raw())
+				t.batch.Set(ethdb.TrieDBI, root, val.Raw())
 			}
 		} else {
 			root = make([]byte, 32)
@@ -123,7 +124,7 @@ func (t *Txn) Hash() ([]byte, error) {
 		root = h.hash.Sum(nil)
 
 		if t.batch != nil {
-			t.batch.Set(root, tmp)
+			t.batch.Set(ethdb.TrieDBI, root, tmp)
 		}
 	}
 
@@ -195,7 +196,7 @@ func (t *Txn) hash(node Node, h *hasher, a *fastrlp.Arena, d int) *fastrlp.Value
 
 	// Write data
 	if t.batch != nil {
-		t.batch.Set(tmp, h.buf)
+		t.batch.Set(ethdb.TrieDBI, tmp, h.buf)
 	}
 
 	return a.NewCopyBytes(hh)
