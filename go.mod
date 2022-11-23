@@ -25,7 +25,7 @@ require (
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.14.0
 	github.com/stretchr/testify v1.8.1
-	github.com/sunvim/gmdbx v0.0.2
+	github.com/sunvim/gmdbx v0.0.3
 	github.com/sunvim/utils v0.0.10
 	github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b
 	golang.org/x/crypto v0.3.0

@@ -643,8 +643,8 @@ github.com/stretchr/testify v1.8.1 h1:w7B6lhMri9wdJUVmEZPGGhZzrYTPvgJArz7wNPgYKs
 github.com/stretchr/testify v1.8.1/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o6fzry7u4=
 github.com/subosito/gotenv v1.4.1 h1:jyEFiXpy21Wm81FBN71l9VoMMV8H8jG+qIK3GCpY6Qs=
 github.com/subosito/gotenv v1.4.1/go.mod h1:ayKnFf/c6rvx/2iiLrJUk1e6plDbT3edrFNGqEflhK0=
-github.com/sunvim/gmdbx v0.0.2 h1:ptprUkTbplAXGIgpe5XiqwIxQ5pEATMOkHS5pHW3cq8=
-github.com/sunvim/gmdbx v0.0.2/go.mod h1:r7oYvilsvR9hFYeJZLIGqrST4Fw2XV+Egjij/9ipuC8=
+github.com/sunvim/gmdbx v0.0.3 h1:Bhfl9u3PJE3xfBpjHs/oRYc6DZJOaX0udWh+Zjqh8MY=
+github.com/sunvim/gmdbx v0.0.3/go.mod h1:r7oYvilsvR9hFYeJZLIGqrST4Fw2XV+Egjij/9ipuC8=
 github.com/sunvim/utils v0.0.10 h1:KLKgxeG3mwksHY0wwhtG9YAVSfoBPBn1CRkxAdCgd7I=
 github.com/sunvim/utils v0.0.10/go.mod h1:XKhuzqIS2TXZOVNTkjtvkdsimQd+23hBOgkayVUmnas=
 github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07/go.mod h1:kDXzergiv9cbyO7IOYJZWg1U88JhDg3PB6klq9Hg2pA=

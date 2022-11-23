@@ -13,20 +13,15 @@ type MdbxDB struct {
 
 var (
 	defaultGeometry = gmdbx.Geometry{
-		SizeLower:       1 << 21,
-		SizeNow:         1 << 21,
+		SizeLower:       1 << 24,
+		SizeNow:         1 << 24,
 		SizeUpper:       1 << 43,
-		GrowthStep:      1 << 23,
-		ShrinkThreshold: 1 << 24,
+		GrowthStep:      1 << 25,
+		ShrinkThreshold: 1 << 26,
 		PageSize:        1 << 16,
 	}
 
-	defaultFlags = gmdbx.EnvSyncDurable |
-		gmdbx.EnvNoTLS |
-		gmdbx.EnvWriteMap |
-		gmdbx.EnvLIFOReclaim |
-		gmdbx.EnvNoReadAhead |
-		gmdbx.EnvCoalesce
+	defaultFlags = gmdbx.EnvSyncDurable | gmdbx.EnvNoReadAhead | gmdbx.EnvCoalesce
 
 	dbis = []string{
 		ethdb.BodyDBI,
@@ -46,7 +41,7 @@ func NewMDBX(path string) *MdbxDB {
 		panic(err)
 	}
 
-	if err := env.SetOption(gmdbx.OptMaxDB, 1024); err != gmdbx.ErrSuccess {
+	if err := env.SetOption(gmdbx.OptMaxDB, 32); err != gmdbx.ErrSuccess {
 		panic(err)
 	}
 
@@ -55,6 +50,34 @@ func NewMDBX(path string) *MdbxDB {
 	}
 
 	if err := env.SetOption(gmdbx.OptMaxReaders, 32000); err != gmdbx.ErrSuccess {
+		panic(err)
+	}
+
+	if err = env.SetOption(gmdbx.OptMergeThreshold16Dot16Percent, 32768); err != gmdbx.ErrSuccess {
+		panic(err)
+	}
+
+	txnDpInitial, err := env.GetOption(gmdbx.OptTxnDpInitial)
+	if err != gmdbx.ErrSuccess {
+		panic(err)
+	}
+	if err = env.SetOption(gmdbx.OptTxnDpInitial, txnDpInitial*2); err != gmdbx.ErrSuccess {
+		panic(err)
+	}
+
+	dpReserveLimit, err := env.GetOption(gmdbx.OptDpReserveLimit)
+	if err != gmdbx.ErrSuccess {
+		panic(err)
+	}
+	if err = env.SetOption(gmdbx.OptDpReserveLimit, dpReserveLimit*2); err != gmdbx.ErrSuccess {
+		panic(err)
+	}
+
+	defaultDirtyPagesLimit, err := env.GetOption(gmdbx.OptTxnDpLimit)
+	if err != gmdbx.ErrSuccess {
+		panic(err)
+	}
+	if err = env.SetOption(gmdbx.OptTxnDpLimit, defaultDirtyPagesLimit*2); err != gmdbx.ErrSuccess { // default is RAM/42
 		panic(err)
 	}
 
@@ -80,7 +103,7 @@ func NewMDBX(path string) *MdbxDB {
 
 	// create or open all dbi
 	for _, dbiName := range dbis {
-		dbi, err := tx.OpenDBI(ethdb.TrieDBI, gmdbx.DBCreate)
+		dbi, err := tx.OpenDBI(dbiName, gmdbx.DBCreate)
 		if err != gmdbx.ErrSuccess {
 			panic(err)
 		}
