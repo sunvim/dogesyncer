@@ -147,11 +147,6 @@ func (e *Event) AddOldHeader(oldHeader *types.Header) {
 	e.OldChain = append(e.OldChain, header)
 }
 
-// SubscribeEvents returns a blockchain event subscription
-func (b *Blockchain) SubscribeEvents() Subscription {
-	return b.stream.subscribe()
-}
-
 // eventStream is the structure that contains the event list,
 // as well as the update channel which it uses to notify of updates
 type eventStream struct {

@@ -1,34 +1,23 @@
 package mdbx
 
 import (
-	"errors"
-	"sync"
+	"fmt"
 
 	"github.com/sunvim/dogesyncer/ethdb"
 	"github.com/sunvim/gmdbx"
 )
 
-var (
-	txpool = &sync.Pool{
-		New: func() any {
-			return &gmdbx.Tx{}
-		},
-	}
-)
-
 func (d *MdbxDB) Set(dbi string, k []byte, v []byte) error {
 
-	tx := txpool.Get().(*gmdbx.Tx)
-	defer txpool.Put(tx)
-
+	tx := &gmdbx.Tx{}
 	if err := d.env.Begin(tx, gmdbx.TxReadWrite); err != gmdbx.ErrSuccess {
-		return errors.New("open tx failed")
+		return fmt.Errorf("open tx failed")
 	}
 	defer tx.Commit()
 
 	key, val := gmdbx.Bytes(&k), gmdbx.Bytes(&v)
 	if err := tx.Put(d.dbi[dbi], &key, &val, gmdbx.PutUpsert); err != gmdbx.ErrSuccess {
-		return errors.New("insert db failed")
+		return fmt.Errorf("insert db failed: " + err.Error())
 	}
 
 	return nil
@@ -36,11 +25,10 @@ func (d *MdbxDB) Set(dbi string, k []byte, v []byte) error {
 
 func (d *MdbxDB) Get(dbi string, k []byte) ([]byte, bool, error) {
 
-	tx := txpool.Get().(*gmdbx.Tx)
-	defer txpool.Put(tx)
+	tx := &gmdbx.Tx{}
 
 	if err := d.env.Begin(tx, gmdbx.TxReadOnly); err != gmdbx.ErrSuccess {
-		return nil, false, errors.New("open tx failed")
+		return nil, false, fmt.Errorf("open tx failed")
 	}
 	defer tx.Commit()
 
@@ -50,7 +38,7 @@ func (d *MdbxDB) Get(dbi string, k []byte) ([]byte, bool, error) {
 	err := tx.Get(d.dbi[dbi], &key, &val)
 	if err != gmdbx.ErrSuccess {
 		if err != gmdbx.ErrNotFound {
-			return nil, false, errors.New("get failed: " + err.Error())
+			return nil, false, fmt.Errorf("get failed: " + err.Error())
 		}
 		return nil, false, nil
 	}
@@ -64,7 +52,9 @@ func (d *MdbxDB) Close() error {
 	for _, v := range d.dbi {
 		d.env.CloseDBI(v)
 	}
-	d.env.Close(false)
+	if err := d.env.Close(false); err != gmdbx.ErrSuccess {
+		return fmt.Errorf("close db failed: %s ", err.Error())
+	}
 
 	return nil
 }

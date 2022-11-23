@@ -28,7 +28,7 @@ type Server struct {
 
 	chain *chain.Chain
 
-	blockchain blockchain.IBlockchain
+	blockchain *blockchain.Blockchain
 
 	// state executor
 	executor *state.Executor
@@ -105,6 +105,17 @@ func NewServer(config *ServerConfig) (*Server, error) {
 	// compute the genesis root state
 	genesisRoot := m.executor.WriteGenesis(config.Chain.Genesis.Alloc)
 	config.Chain.Genesis.StateRoot = genesisRoot
+
+	// blockchain
+	m.blockchain, err = blockchain.NewBlockchain(logger, db, config.Chain)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.blockchain.HandleGenesis()
+	if err != nil {
+		return nil, err
+	}
 
 	// setup and start grpc server
 	if err := m.setupGRPC(); err != nil {
@@ -196,15 +207,19 @@ func (s *Server) JoinPeer(rawPeerMultiaddr string) error {
 // Close closes the Minimal server (blockchain, networking, consensus)
 func (s *Server) Close() error {
 
+	s.logger.Info("closing network...")
 	// Close the networking layer
 	if err := s.network.Close(); err != nil {
 		s.logger.Error("failed to close networking", "err", err.Error())
 	}
+	s.logger.Info("network close over")
 
+	s.logger.Info("closing storage...")
 	// Close the state storage
 	if err := s.stateStorage.Close(); err != nil {
 		s.logger.Error("failed to close storage for trie", "err", err.Error())
 	}
+	s.logger.Info("close storage over")
 
 	return nil
 

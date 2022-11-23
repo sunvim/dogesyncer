@@ -94,13 +94,13 @@ func TestDatabaseSuite(t *testing.T, New func() ethdb.Database) {
 			// Create the key-value data store
 			db := New()
 			for key, val := range tt.content {
-				if err := db.Set(ethdb.BlockDBI, []byte(key), []byte(val)); err != nil {
+				if err := db.Set(ethdb.BodyDBI, []byte(key), []byte(val)); err != nil {
 					t.Fatalf("test %d: failed to insert item %s:%s into database: %v", i, key, val, err)
 				}
 			}
 			// Iterate over the database with the given configs and verify the results
 			for key, val := range tt.content {
-				got, _, _ := db.Get(ethdb.BlockDBI, []byte(key))
+				got, _, _ := db.Get(ethdb.BodyDBI, []byte(key))
 				if !bytes.Equal(got, []byte(val)) {
 					t.Errorf("test %d:  value mismatch: have %s, want %s", i, string(got), val)
 				}
@@ -115,12 +115,12 @@ func TestDatabaseSuite(t *testing.T, New func() ethdb.Database) {
 
 		b := db.Batch()
 		for _, k := range []string{"1", "2", "3", "4"} {
-			if err := b.Set(ethdb.BlockDBI, []byte(k), nil); err != nil {
+			if err := b.Set(ethdb.BodyDBI, []byte(k), nil); err != nil {
 				t.Fatal(err)
 			}
 		}
 
-		if _, has, err := db.Get(ethdb.BlockDBI, []byte("1")); err != nil {
+		if _, has, err := db.Get(ethdb.BodyDBI, []byte("1")); err != nil {
 			t.Fatal(err)
 		} else if has {
 			t.Error("db contains element before batch write")

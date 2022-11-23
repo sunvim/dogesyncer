@@ -39,9 +39,7 @@ func (b *KVBatch) Set(dbi string, k, v []byte) error {
 // why no error handle
 func (b *KVBatch) Write() error {
 
-	tx := txpool.Get().(*gmdbx.Tx)
-	defer txpool.Put(tx)
-
+	tx := &gmdbx.Tx{}
 	if err := b.env.Begin(tx, gmdbx.TxReadWrite); err != gmdbx.ErrSuccess {
 		return errors.New("open tx failed " + err.Error())
 	}

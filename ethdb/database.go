@@ -1,8 +1,13 @@
 package ethdb
 
 var (
-	TrieDBI  = "trie"
-	BlockDBI = "block"
+	TrieDBI    = "trie"
+	BodyDBI    = "block"
+	HeadDBI    = "head"
+	AssistDBI  = "assist"
+	NumHashDBI = "numhash"
+	TxesDBI    = "txes"
+	TDDBI      = "td" // total difficulty
 )
 
 type Setter interface {

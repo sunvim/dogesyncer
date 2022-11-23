@@ -15,7 +15,7 @@ var (
 	defaultGeometry = gmdbx.Geometry{
 		SizeLower:       1 << 21,
 		SizeNow:         1 << 21,
-		SizeUpper:       1 << 40,
+		SizeUpper:       1 << 43,
 		GrowthStep:      1 << 23,
 		ShrinkThreshold: 1 << 24,
 		PageSize:        1 << 16,
@@ -27,6 +27,16 @@ var (
 		gmdbx.EnvLIFOReclaim |
 		gmdbx.EnvNoReadAhead |
 		gmdbx.EnvCoalesce
+
+	dbis = []string{
+		ethdb.BodyDBI,
+		ethdb.AssistDBI,
+		ethdb.TrieDBI,
+		ethdb.NumHashDBI,
+		ethdb.TxesDBI,
+		ethdb.HeadDBI,
+		ethdb.TDDBI,
+	}
 )
 
 func NewMDBX(path string) *MdbxDB {
@@ -62,24 +72,20 @@ func NewMDBX(path string) *MdbxDB {
 	}
 	d.env = env
 
-	// create or open all dbi
 	tx := &gmdbx.Tx{}
 	if err = env.Begin(tx, gmdbx.TxReadWrite); err != gmdbx.ErrSuccess {
 		panic(err)
 	}
 	defer tx.Commit()
 
-	dbi, err := tx.OpenDBI(ethdb.TrieDBI, gmdbx.DBCreate)
-	if err != gmdbx.ErrSuccess {
-		panic(err)
+	// create or open all dbi
+	for _, dbiName := range dbis {
+		dbi, err := tx.OpenDBI(ethdb.TrieDBI, gmdbx.DBCreate)
+		if err != gmdbx.ErrSuccess {
+			panic(err)
+		}
+		d.dbi[dbiName] = dbi
 	}
-	d.dbi[ethdb.TrieDBI] = dbi
-
-	dbi, err = tx.OpenDBI(ethdb.BlockDBI, gmdbx.DBCreate)
-	if err != gmdbx.ErrSuccess {
-		panic(err)
-	}
-	d.dbi[ethdb.BlockDBI] = dbi
 
 	return d
 }
