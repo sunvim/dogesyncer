@@ -2,6 +2,7 @@ package mdbx
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/sunvim/gmdbx"
 )
@@ -41,7 +42,7 @@ func (b *KVBatch) Write() error {
 
 	tx := &gmdbx.Tx{}
 	if err := b.env.Begin(tx, gmdbx.TxReadWrite); err != gmdbx.ErrSuccess {
-		return errors.New("open tx failed " + err.Error())
+		return fmt.Errorf("open tx failed %s", err.Error())
 	}
 	defer tx.Commit()
 

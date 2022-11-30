@@ -2,9 +2,7 @@ package protocol
 
 import (
 	"math/big"
-	"sort"
 	"sync"
-	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/sunvim/dogesyncer/protocol/proto"
@@ -70,10 +68,6 @@ type SyncPeer struct {
 	// v1 protocol.
 	status     *Status
 	statusLock sync.RWMutex
-
-	enqueueLock sync.Mutex
-	enqueue     minNumBlockQueue
-	enqueueCh   chan struct{}
 }
 
 // Number returns the latest peer block height
@@ -95,79 +89,6 @@ func (s *SyncPeer) ID() peer.ID {
 
 func (s *SyncPeer) Status() connectivity.State {
 	return s.conn.GetState()
-}
-
-// purgeBlocks purges the cache of broadcasted blocks the node has written so far
-// from the SyncPeer
-func (s *SyncPeer) purgeBlocks(lastSeen types.Hash) uint64 {
-	s.enqueueLock.Lock()
-	defer s.enqueueLock.Unlock()
-
-	index := -1
-
-	for i, b := range s.enqueue {
-		if b.Hash() == lastSeen {
-			index = i
-
-			break
-		}
-	}
-
-	if index == -1 {
-		// no blocks enqueued
-		return 0
-	}
-
-	s.enqueue = s.enqueue[index+1:]
-
-	return uint64(index + 1)
-}
-
-// popBlock pops a block from the block queue [BLOCKING]
-func (s *SyncPeer) popBlock(timeout time.Duration) (b *types.Block, err error) {
-	timeoutCh := time.NewTimer(timeout)
-
-	for {
-		if !s.IsClosed() {
-			s.enqueueLock.Lock()
-			if len(s.enqueue) != 0 {
-				b, s.enqueue = s.enqueue[0], s.enqueue[1:]
-				s.enqueueLock.Unlock()
-
-				return
-			}
-
-			s.enqueueLock.Unlock()
-			select {
-			case <-s.enqueueCh:
-			case <-timeoutCh.C:
-				return nil, ErrPopTimeout
-			}
-		} else {
-			return nil, ErrConnectionClosed
-		}
-	}
-}
-
-// appendBlock adds a new block to the block queue
-func (s *SyncPeer) appendBlock(b *types.Block) {
-	s.enqueueLock.Lock()
-	defer s.enqueueLock.Unlock()
-
-	// append block
-	s.enqueue = append(s.enqueue, b)
-	// sort blocks
-	sort.Stable(&s.enqueue)
-
-	if s.enqueue.Len() > maxEnqueueSize {
-		// pop elements to meet capacity
-		s.enqueue = s.enqueue[s.enqueue.Len()-maxEnqueueSize:]
-	}
-
-	select {
-	case s.enqueueCh <- struct{}{}:
-	default:
-	}
 }
 
 func (s *SyncPeer) updateStatus(status *Status) {

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"path/filepath"
@@ -44,7 +45,7 @@ type Server struct {
 }
 
 // NewServer creates a new Minimal server, using the passed in configuration
-func NewServer(config *ServerConfig) (*Server, error) {
+func NewServer(ctx context.Context, config *ServerConfig) (*Server, error) {
 	logger, err := newLoggerFromConfig(config)
 	if err != nil {
 		return nil, fmt.Errorf("could not setup new logger instance, %w", err)

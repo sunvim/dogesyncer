@@ -8,25 +8,24 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cornelk/hashmap"
-	"github.com/libp2p/go-libp2p"
-	noise "github.com/libp2p/go-libp2p-noise"
-	"github.com/sunvim/dogesyncer/network/common"
-	"github.com/sunvim/dogesyncer/network/dial"
-	"github.com/sunvim/dogesyncer/network/discovery"
-	rawGrpc "google.golang.org/grpc"
-
 	"github.com/hashicorp/go-hclog"
+	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/event"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	noise "github.com/libp2p/go-libp2p-noise"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/multiformats/go-multiaddr"
+	cmap "github.com/sunvim/dogesyncer/helper/concurrentmap"
+	"github.com/sunvim/dogesyncer/network/common"
+	"github.com/sunvim/dogesyncer/network/dial"
+	"github.com/sunvim/dogesyncer/network/discovery"
 	peerEvent "github.com/sunvim/dogesyncer/network/event"
 	"github.com/sunvim/dogesyncer/secrets"
+	rawGrpc "google.golang.org/grpc"
 )
 
 const (
@@ -85,7 +84,7 @@ type Server struct {
 
 	connectionCounts *ConnectionInfo
 
-	temporaryDials *hashmap.Map[peer.ID, bool] // map of temporary connections; peerID -> bool
+	temporaryDials cmap.ConcurrentMap // map of temporary connections; peerID -> bool
 
 	bootnodes *bootnodesWrapper // reference of all bootnodes for the node
 }
@@ -158,7 +157,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 			config.MaxInboundPeers,
 			config.MaxOutboundPeers,
 		),
-		temporaryDials: hashmap.New[peer.ID, bool](),
+		temporaryDials: cmap.NewConcurrentMap(),
 	}
 
 	// start gossip protocol
@@ -450,6 +449,18 @@ func (s *Server) Peers() []*PeerConnInfo {
 	}
 
 	return peers
+}
+
+func (s *Server) BootnodePeers() []*PeerConnInfo {
+
+	peers := make([]*PeerConnInfo, 0)
+
+	for id := range s.bootnodes.bootnodesMap {
+		peers = append(peers, s.peers[id])
+	}
+
+	return peers
+
 }
 
 // hasPeer checks if the peer is present in the peers list [Thread safe]

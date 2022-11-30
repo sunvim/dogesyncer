@@ -31,6 +31,7 @@ var (
 		ethdb.TxesDBI,
 		ethdb.HeadDBI,
 		ethdb.TDDBI,
+		ethdb.ReceiptsDBI,
 	}
 )
 

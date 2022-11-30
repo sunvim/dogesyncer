@@ -155,13 +155,13 @@ func (d *DiscoveryService) HandleNetworkEvent(peerEvent *event.PeerEvent) {
 func (d *DiscoveryService) ConnectToBootnodes(bootnodes []*peer.AddrInfo) {
 	for _, nodeInfo := range bootnodes {
 		if err := d.addToTable(nodeInfo); err != nil {
-			d.logger.Error(
-				"Failed to add new peer to routing table",
-				"peer",
-				nodeInfo.ID,
-				"err",
-				err,
-			)
+			// d.logger.Error(
+			// 	"Failed to add new peer to routing table",
+			// 	"peer",
+			// 	nodeInfo.ID,
+			// 	"err",
+			// 	err,
+			// )
 		}
 	}
 }
@@ -205,13 +205,13 @@ func (d *DiscoveryService) addPeersToTable(nodeAddrStrs []string) {
 		}
 
 		if err := d.addToTable(nodeInfo); err != nil {
-			d.logger.Error(
-				"Failed to add new peer to routing table",
-				"peer",
-				nodeInfo.ID,
-				"err",
-				err,
-			)
+			// d.logger.Error(
+			// 	"Failed to add new peer to routing table",
+			// 	"peer",
+			// 	nodeInfo.ID,
+			// 	"err",
+			// 	err,
+			// )
 		}
 	}
 }

@@ -55,6 +55,94 @@ func NewBlockchain(logger hclog.Logger, db ethdb.Database, chain *chain.Chain) (
 	return b, nil
 }
 
+func (b *Blockchain) CurrentTD() *big.Int {
+	td, ok := b.currentDifficulty.Load().(*big.Int)
+	if !ok {
+		return nil
+	}
+
+	return td
+}
+
+func (b *Blockchain) GetTD(hash types.Hash) (*big.Int, bool) {
+	return b.readTotalDifficulty(hash)
+}
+
+// get receitps by block header hash
+func (b *Blockchain) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error) {
+	// read body
+	bodies, err := rawdb.ReadBody(b.chaindb, hash)
+	if err != nil {
+		return nil, err
+	}
+	// read receipts
+	receipts := make([]*types.Receipt, len(bodies))
+	for i, tx := range bodies {
+		receipt, err := rawdb.ReadReceipt(b.chaindb, tx)
+		if err != nil {
+			return nil, err
+		}
+		receipts[i] = receipt
+	}
+
+	return receipts, nil
+}
+
+func (b *Blockchain) GetBodyByHash(hash types.Hash) (*types.Body, bool) {
+	// read body
+	bodies, err := rawdb.ReadBody(b.chaindb, hash)
+	if err != nil {
+		return nil, false
+	}
+	// read transactions
+	txes := make([]*types.Transaction, len(bodies))
+	for i, txhash := range bodies {
+		tx, err := rawdb.ReadTransaction(b.chaindb, txhash)
+		if err != nil {
+			return nil, false
+		}
+		txes[i] = tx
+	}
+	return &types.Body{
+		Transactions: txes,
+	}, false
+}
+
+func (b *Blockchain) GetHeaderByHash(hash types.Hash) (*types.Header, bool) {
+	header, err := rawdb.ReadHeader(b.chaindb, hash)
+	if err != nil {
+		return nil, false
+	}
+	return header, true
+}
+
+func (b *Blockchain) GetHeaderByNumber(n uint64) (*types.Header, bool) {
+	// read hash
+	hash, ok := rawdb.ReadCanonicalHash(b.chaindb, n)
+	if !ok {
+		return nil, false
+	}
+
+	header, err := rawdb.ReadHeader(b.chaindb, hash)
+	if err != nil {
+		return nil, false
+	}
+
+	return header, true
+}
+
+func (b *Blockchain) WriteBlock(block *types.Block) error {
+	return nil
+}
+
+func (b *Blockchain) VerifyFinalizedBlock(block *types.Block) error {
+	return nil
+}
+
+func (b *Blockchain) CalculateGasLimit(number uint64) (uint64, error) {
+	return 0, nil
+}
+
 // initCaches initializes the blockchain caches with the specified size
 func (b *Blockchain) initCaches(size int) error {
 	var err error
@@ -114,7 +202,7 @@ func (b *Blockchain) HandleGenesis() error {
 		}
 	}
 
-	b.logger.Info("genesis", "xhash", b.config.Genesis.Hash())
+	b.logger.Info("genesis", "hash", b.config.Genesis.Hash())
 
 	return nil
 }

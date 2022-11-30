@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/sunvim/dogesyncer/protocol/proto"
@@ -66,6 +67,7 @@ func (s *skeleton) getBlocksFromPeer(
 		},
 	)
 	if err != nil {
+		fmt.Printf("header err: %v \n", err)
 		return err
 	}
 

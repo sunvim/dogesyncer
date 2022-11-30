@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/spf13/cobra"
+	"github.com/sunvim/dogesyncer/protocol"
 	"github.com/sunvim/utils/grace"
 )
 
@@ -12,14 +13,20 @@ const (
 )
 
 func Run(cmd *cobra.Command, args []string) {
-	_, svc := grace.New(context.Background())
+	ctx, svc := grace.New(context.Background())
 
-	m, err := NewServer(params.generateConfig())
+	m, err := NewServer(ctx, params.generateConfig())
 	if err != nil {
 		panic(err)
 	}
+
 	svc.Register(m.Close)
 
+	m.logger.Info("start to syncer")
+	syncer := protocol.NewSyncer(m.logger, m.network, m.blockchain)
+	syncer.Start(ctx)
+
+	m.logger.Info("server boot over...")
 	svc.Wait()
 }
 
