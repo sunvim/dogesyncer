@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cornelk/hashmap"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/sunvim/dogesyncer/blockchain"
-	cmap "github.com/sunvim/dogesyncer/helper/concurrentmap"
 	"github.com/sunvim/dogesyncer/helper/progress"
 	"github.com/sunvim/dogesyncer/network"
 	"github.com/sunvim/dogesyncer/network/event"
@@ -19,9 +19,7 @@ import (
 	"github.com/sunvim/dogesyncer/protocol/proto"
 	"github.com/sunvim/dogesyncer/types"
 	pq "github.com/sunvim/utils/priorityqueue"
-	grpccodes "google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
-	grpcstatus "google.golang.org/grpc/status"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -70,8 +68,7 @@ type Syncer struct {
 	logger     hclog.Logger
 	blockchain blockchainShim
 
-	peers      cmap.ConcurrentMap // Maps peer.ID -> SyncPeer
-	trustPeers cmap.ConcurrentMap
+	peers *hashmap.Map[peer.ID, *SyncPeer] // Maps peer.ID -> SyncPeer
 
 	serviceV1 *serviceV1
 	stopCh    chan struct{}
@@ -98,8 +95,7 @@ func NewSyncer(logger hclog.Logger, server *network.Server, blockchain blockchai
 		blockchain:      blockchain,
 		server:          server,
 		syncProgression: progress.NewProgressionWrapper(progress.ChainSyncBulk),
-		peers:           cmap.NewConcurrentMap(),
-		trustPeers:      cmap.NewConcurrentMap(),
+		peers:           hashmap.New[peer.ID, *SyncPeer](),
 		enqueue:         pq.NewPriorityQueue(defQueueSize, false),
 		enqueueCh:       make(chan struct{}, defQueueSize),
 	}
@@ -192,14 +188,7 @@ func (s *Syncer) updatePeerStatus(peerID peer.ID, status *Status) {
 		status.Difficulty,
 	)
 
-	if peer, ok := s.peers.Load(peerID); ok {
-		syncPeer, ok := peer.(*SyncPeer)
-		if !ok {
-			s.logger.Error("invalid sync peer type cast")
-
-			return
-		}
-
+	if syncPeer, ok := s.peers.Get(peerID); ok {
 		syncPeer.updateStatus(status)
 	}
 }
@@ -207,13 +196,8 @@ func (s *Syncer) updatePeerStatus(peerID peer.ID, status *Status) {
 // Broadcast broadcasts a block to all peers
 func (s *Syncer) Broadcast(b *types.Block) {
 
-	sendNotify := func(peerID, peer interface{}, req *proto.NotifyReq) {
+	sendNotify := func(peerID peer.ID, syncPeer *SyncPeer, req *proto.NotifyReq) {
 		startTime := time.Now()
-
-		syncPeer, ok := peer.(*SyncPeer)
-		if !ok {
-			return
-		}
 
 		if _, err := syncPeer.client.Notify(context.Background(), req); err != nil {
 			s.logger.Error("failed to notify", "err", err)
@@ -252,12 +236,11 @@ func (s *Syncer) Broadcast(b *types.Block) {
 	}
 
 	s.logger.Debug("broadcast start")
-
-	s.peers.Range(func(peerID, peer interface{}) bool {
+	s.peers.Range(func(peerID peer.ID, peer *SyncPeer) bool {
 		go sendNotify(peerID, peer, req)
-
 		return true
 	})
+
 	s.logger.Debug("broadcast end")
 }
 
@@ -296,7 +279,6 @@ func (s *Syncer) Start(ctx context.Context) {
 
 func (s *Syncer) SyncWork(ctx context.Context) {
 	s.logger.Info("starting to sync block ...")
-	time.Sleep(45 * time.Second)
 
 	for {
 		p := s.BestPeer()
@@ -345,24 +327,19 @@ func (s *Syncer) SyncWork(ctx context.Context) {
 				break
 			}
 
-			sk := &skeleton{
-				amount: blockAmount,
-			}
-
-			time.Sleep(10 * time.Second)
-
 			stx := time.Now()
-			// Fetch the blocks from the peer
-			if err := sk.getBlocksFromPeer(p.client, currentSyncHeight); err != nil {
-				if rpcErr, ok := grpcstatus.FromError(err); ok {
-					// the data size exceeds grpc server/client message size
-					if rpcErr.Code() == grpccodes.ResourceExhausted {
-						blockAmount /= 2
-						continue
-					}
-				}
-				s.logger.Info("get remote block", "err", err, "peer", p.ID())
-				break
+
+			headers, err := getHeaders(
+				p.client,
+				&proto.GetHeadersRequest{
+					Number: int64(currentSyncHeight),
+					Skip:   0,
+					Amount: 190,
+				},
+			)
+			if err != nil {
+				s.logger.Error("header get", "err", err)
+				return
 			}
 			s.logger.Info("get remote block", "currentSyncHeight", currentSyncHeight, "amount", blockAmount, "elapse", time.Since(stx))
 
@@ -372,14 +349,13 @@ func (s *Syncer) SyncWork(ctx context.Context) {
 				blockAmount = maxSkeletonHeadersAmount
 			}
 
-			for _, block := range sk.blocks {
-				s.logger.Info("sync block", "block", block)
+			for _, header := range headers {
+				s.logger.Info("sync block", "block", header)
 				currentSyncHeight++
 			}
 
 		}
 
-		// find in batches
 	}
 }
 
@@ -390,10 +366,6 @@ func (s *Syncer) setupPeers() {
 		if addErr := s.AddPeer(p.Info.ID); addErr != nil {
 			s.logger.Error(fmt.Sprintf("Error when adding peer [%s], %v", p.Info.ID, addErr))
 		}
-	}
-
-	for _, p := range s.server.BootnodePeers() {
-		s.trustPeers.Store(p.Info.ID, p)
 	}
 
 }
@@ -428,68 +400,6 @@ func (s *Syncer) handlePeerEvent(ctx context.Context) {
 	}(ctx)
 }
 
-func (s *Syncer) ShowPeersStatus() {
-	s.logger.Info("=========================")
-	s.peers.Range(func(peerID, peer interface{}) bool {
-		syncPeer, ok := peer.(*SyncPeer)
-		if !ok {
-			return false
-		}
-		s.logger.Info("show peer", "peer", peerID, "number", syncPeer.Number(), "state", syncPeer.Status())
-		// get headers
-		headers, err := getHeaders(
-			syncPeer.client,
-			&proto.GetHeadersRequest{
-				Number: int64(1),
-				Skip:   0,
-				Amount: 190,
-			},
-		)
-		if err != nil {
-			s.logger.Error("sync header", "peer", peerID, "err", err)
-		}
-		for _, header := range headers {
-			fmt.Printf("peer: %s header: %+v \n", peerID, header)
-		}
-		if len(headers) > 0 {
-			return false
-		}
-		return true
-	})
-	s.logger.Info("=========================")
-}
-
-// BestTrustPeer returns the best peer by difficulty (if any)
-func (s *Syncer) BestTrustPeer() *SyncPeer {
-
-	var (
-		bestPeer        *SyncPeer
-		bestBlockNumber uint64
-	)
-
-	s.trustPeers.Range(func(peerID, peer interface{}) bool {
-		syncPeer, ok := peer.(*SyncPeer)
-		if !ok {
-			return false
-		}
-
-		peerBlockNumber := syncPeer.Number()
-		// compare block height
-		if bestPeer == nil || peerBlockNumber > bestBlockNumber {
-			bestPeer = syncPeer
-			bestBlockNumber = peerBlockNumber
-		}
-
-		return true
-	})
-
-	if bestBlockNumber <= s.blockchain.Header().Number {
-		bestPeer = nil
-	}
-
-	return bestPeer
-}
-
 // BestPeer returns the best peer by difficulty (if any)
 func (s *Syncer) BestPeer() *SyncPeer {
 
@@ -498,19 +408,13 @@ func (s *Syncer) BestPeer() *SyncPeer {
 		bestBlockNumber uint64
 	)
 
-	s.peers.Range(func(peerID, peer interface{}) bool {
-		syncPeer, ok := peer.(*SyncPeer)
-		if !ok {
-			return false
-		}
-
-		peerBlockNumber := syncPeer.Number()
+	s.peers.Range(func(peerID peer.ID, sp *SyncPeer) bool {
+		peerBlockNumber := sp.Number()
 		// compare block height
 		if bestPeer == nil || peerBlockNumber > bestBlockNumber {
-			bestPeer = syncPeer
+			bestPeer = sp
 			bestBlockNumber = peerBlockNumber
 		}
-
 		return true
 	})
 
@@ -524,7 +428,7 @@ func (s *Syncer) BestPeer() *SyncPeer {
 // AddPeer establishes new connection with the given peer
 func (s *Syncer) AddPeer(peerID peer.ID) error {
 
-	if _, ok := s.peers.Load(peerID); ok {
+	if _, ok := s.peers.Get(peerID); ok {
 		// already connected
 		return nil
 	}
@@ -550,7 +454,7 @@ func (s *Syncer) AddPeer(peerID peer.ID) error {
 		return err
 	}
 
-	s.peers.Store(peerID, &SyncPeer{
+	s.peers.Set(peerID, &SyncPeer{
 		peer:   peerID,
 		conn:   conn,
 		client: clt,
@@ -563,14 +467,10 @@ func (s *Syncer) AddPeer(peerID peer.ID) error {
 // DeletePeer deletes a peer from syncer
 func (s *Syncer) DeletePeer(peerID peer.ID) error {
 
-	p, ok := s.peers.LoadAndDelete(peerID)
+	p, ok := s.peers.Get(peerID)
 	if ok {
-		syncPeer, ok := p.(*SyncPeer)
-		if !ok {
-			return ErrInvalidTypeAssertion
-		}
-
-		if err := syncPeer.conn.Close(); err != nil {
+		s.peers.Del(peerID)
+		if err := p.conn.Close(); err != nil {
 			return err
 		}
 	}
