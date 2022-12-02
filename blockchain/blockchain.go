@@ -10,6 +10,7 @@ import (
 	"github.com/sunvim/dogesyncer/chain"
 	"github.com/sunvim/dogesyncer/ethdb"
 	"github.com/sunvim/dogesyncer/rawdb"
+	"github.com/sunvim/dogesyncer/state"
 	"github.com/sunvim/dogesyncer/types"
 )
 
@@ -19,6 +20,7 @@ type Blockchain struct {
 	chaindb           ethdb.Database
 	genesis           types.Hash
 	stream            *eventStream // Event subscriptions
+	executor          Executor
 	currentHeader     atomic.Value // The current header
 	currentDifficulty atomic.Value // The current difficulty of the chain (total difficulty)
 
@@ -38,12 +40,20 @@ type Blockchain struct {
 
 }
 
-func NewBlockchain(logger hclog.Logger, db ethdb.Database, chain *chain.Chain) (*Blockchain, error) {
+type Executor interface {
+	BeginTxn(parentRoot types.Hash, header *types.Header, coinbase types.Address) (*state.Transition, error)
+	//nolint:lll
+	ProcessTransactions(transition *state.Transition, gasLimit uint64, transactions []*types.Transaction) (*state.Transition, error)
+	Stop()
+}
+
+func NewBlockchain(logger hclog.Logger, db ethdb.Database, chain *chain.Chain, executor Executor) (*Blockchain, error) {
 	b := &Blockchain{
-		logger:  logger.Named("blockchain"),
-		chaindb: db,
-		config:  chain,
-		stream:  &eventStream{},
+		logger:   logger.Named("blockchain"),
+		chaindb:  db,
+		config:   chain,
+		stream:   &eventStream{},
+		executor: executor,
 	}
 
 	err := b.initCaches(32)
@@ -132,6 +142,7 @@ func (b *Blockchain) GetHeaderByNumber(n uint64) (*types.Header, bool) {
 }
 
 func (b *Blockchain) WriteBlock(block *types.Block) error {
+	fmt.Printf("block: %+v\n", block)
 	return nil
 }
 
@@ -207,11 +218,7 @@ func (b *Blockchain) HandleGenesis() error {
 	return nil
 }
 
-func (b *Blockchain) writeGenesis(genesis *chain.Genesis) error {
-	header := genesis.GenesisHeader()
-	header.ComputeHash()
-
-	b.genesis = header.Hash
+func (b *Blockchain) WriteHeader(header *types.Header) error {
 	err := rawdb.WriteHeader(b.chaindb, header)
 	if err != nil {
 		return fmt.Errorf("failed to write header %s %v", header.Hash, err)
@@ -226,8 +233,56 @@ func (b *Blockchain) writeGenesis(genesis *chain.Genesis) error {
 	event := &Event{}
 	event.AddNewHeader(header)
 	b.stream.push(event)
-
 	return nil
+}
+
+func (b *Blockchain) writeGenesis(genesis *chain.Genesis) error {
+
+	header := genesis.GenesisHeader()
+	header.ComputeHash()
+	b.genesis = header.Hash
+
+	if err := rawdb.WriteTD(b.chaindb, header.Hash, 1); err != nil {
+		return fmt.Errorf("write td failed %v", err)
+	}
+
+	return b.WriteHeader(header)
+}
+
+func (b *Blockchain) VerifyHeader(header *types.Header) error {
+	// check parent hash
+	hash, ok := rawdb.ReadCanonicalHash(b.chaindb, header.Number-1)
+	if !ok {
+		return fmt.Errorf("not found block %d ", header.Number-1)
+	}
+	parent, err := rawdb.ReadHeader(b.chaindb, hash)
+	if err != nil {
+		return fmt.Errorf("get parent header %v", err)
+	}
+	if parent.Hash != header.ParentHash {
+		return fmt.Errorf("unexpected header %s != %s %s", parent.Hash, header.ParentHash, parent.ComputeHash().Hash)
+	}
+	// check header self hash
+	if header.Hash != types.HeaderHash(header) {
+		return fmt.Errorf("header self check err %s != %s", header.Hash, types.HeaderHash(header))
+	}
+	return nil
+}
+
+func (b *Blockchain) addHeaderSnap(header *types.Header) error {
+
+	extra, err := types.GetIbftExtra(header)
+	if err != nil {
+		return err
+	}
+	s := &types.Snapshot{
+		Hash:   header.Hash.String(),
+		Number: header.Number,
+		Votes:  []*types.Vote{},
+		Set:    extra.Validators,
+	}
+
+	return rawdb.WriteSnap(b.chaindb, header.Number, s)
 }
 
 func (b *Blockchain) advanceHead(newHeader *types.Header) (*big.Int, error) {
@@ -246,24 +301,13 @@ func (b *Blockchain) advanceHead(newHeader *types.Header) (*big.Int, error) {
 		return nil, err
 	}
 
-	// Check if there was a parent difficulty
-	parentTD := big.NewInt(0)
-	if newHeader.ParentHash != types.StringToHash("") {
-		td, ok := b.readTotalDifficulty(newHeader.ParentHash)
-		if !ok {
-			return nil, fmt.Errorf("parent difficulty not found")
-		}
-
-		parentTD = td
-	}
 	// Calculate the new total difficulty
-	newTD := big.NewInt(0).Add(parentTD, big.NewInt(0).SetUint64(newHeader.Difficulty))
-	if err := rawdb.WriteTD(b.chaindb, newHeader.Hash, newTD.Uint64()); err != nil {
+	if err := rawdb.WriteTD(b.chaindb, newHeader.Hash, newHeader.Difficulty); err != nil {
 		return nil, err
 	}
 
 	// Update the blockchain reference
-	b.setCurHeader(newHeader, newTD.Uint64())
+	b.setCurHeader(newHeader, newHeader.Difficulty)
 
 	return nil, nil
 }

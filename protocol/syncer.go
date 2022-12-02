@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"math"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/cornelk/hashmap"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/smallnest/chanx"
 	"github.com/sunvim/dogesyncer/blockchain"
 	"github.com/sunvim/dogesyncer/helper/progress"
 	"github.com/sunvim/dogesyncer/network"
@@ -19,7 +21,9 @@ import (
 	"github.com/sunvim/dogesyncer/protocol/proto"
 	"github.com/sunvim/dogesyncer/types"
 	pq "github.com/sunvim/utils/priorityqueue"
+	grpccodes "google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
+	grpcstatus "google.golang.org/grpc/status"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -46,21 +50,6 @@ var (
 	ErrInvalidTypeAssertion   = errors.New("invalid type assertion")
 )
 
-type NewBlockInfo struct {
-	Number uint64
-	Hash   types.Hash
-}
-
-func (n *NewBlockInfo) Compare(other pq.Item) int {
-	o := other.(*NewBlockInfo)
-	if o.Number < n.Number {
-		return 1
-	} else if o.Number == n.Number {
-		return 0
-	}
-	return -1
-}
-
 // blocks sorted by number (ascending)
 
 // Syncer is a sync protocol
@@ -81,13 +70,13 @@ type Syncer struct {
 
 	// save new block info from remote peer
 	enqueue   *pq.PriorityQueue
-	enqueueCh chan struct{}
+	enqueueCh *chanx.UnboundedChan[struct{}]
 }
 
 // NewSyncer creates a new Syncer instance
 func NewSyncer(logger hclog.Logger, server *network.Server, blockchain blockchainShim) *Syncer {
 
-	const defQueueSize = 8192
+	const defQueueSize = 819200
 
 	s := &Syncer{
 		logger:          logger.Named(_syncerName),
@@ -97,7 +86,7 @@ func NewSyncer(logger hclog.Logger, server *network.Server, blockchain blockchai
 		syncProgression: progress.NewProgressionWrapper(progress.ChainSyncBulk),
 		peers:           hashmap.New[peer.ID, *SyncPeer](),
 		enqueue:         pq.NewPriorityQueue(defQueueSize, false),
-		enqueueCh:       make(chan struct{}, defQueueSize),
+		enqueueCh:       chanx.NewUnboundedChan[struct{}](defQueueSize),
 	}
 
 	return s
@@ -166,13 +155,8 @@ func (s *Syncer) updateStatus(status *Status) {
 func (s *Syncer) enqueueBlock(peerID peer.ID, b *types.Block) {
 	s.logger.Debug("enqueue block", "peer", peerID, "number", b.Number(), "hash", b.Hash())
 
-	nb := &NewBlockInfo{
-		Number: b.Number(),
-		Hash:   b.Hash(),
-	}
-
-	s.enqueue.Put(nb)
-	s.enqueueCh <- struct{}{}
+	s.enqueue.Put(b)
+	s.enqueueCh.In <- struct{}{}
 }
 
 func (s *Syncer) updatePeerStatus(peerID peer.ID, status *Status) {
@@ -275,16 +259,57 @@ func (s *Syncer) Start(ctx context.Context) {
 
 	go s.handlePeerEvent(ctx)
 
+	go s.SyncWork(ctx)
+
+	go s.WatchSync(ctx)
+
 }
 
+func (s *Syncer) WatchSync(ctx context.Context) {
+
+	for {
+		time.Sleep(5 * time.Second)
+		item := s.enqueue.Peek()
+		if item == nil {
+			continue
+		}
+		num := item.(*types.Block).Number()
+
+		curHeight := s.blockchain.Header().Number
+		if curHeight+1 == num {
+			break
+		}
+	}
+
+	for {
+		select {
+		case <-s.enqueueCh.Out:
+			// drop them before finish evm compatiable
+			items, err := s.enqueue.Get(1)
+			if err != nil {
+				s.logger.Error("watch sync", "err", err)
+				continue
+			}
+			newblock := items[0].(*types.Block)
+			err = s.blockchain.WriteBlock(newblock)
+			if err != nil {
+				s.logger.Error("handle new block", "err", err)
+				syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+			}
+		}
+	}
+}
+
+// number: 687 have tx
 func (s *Syncer) SyncWork(ctx context.Context) {
 	s.logger.Info("starting to sync block ...")
+	defer s.logger.Info("exit sync work!")
 
 	for {
 		p := s.BestPeer()
 		if p == nil {
 			s.logger.Info("not found best peer")
-			time.Sleep(30 * time.Second)
+			time.Sleep(10 * time.Second)
 			continue
 		}
 
@@ -297,8 +322,6 @@ func (s *Syncer) SyncWork(ctx context.Context) {
 
 		// return error
 		if err != nil {
-			// No need to sync with this peer
-			s.logger.Error("sync work can't find common ancestor", "err", err)
 			continue
 		}
 
@@ -308,40 +331,40 @@ func (s *Syncer) SyncWork(ctx context.Context) {
 		// dynamic modifying syncing size
 		blockAmount := int64(maxSkeletonHeadersAmount)
 		var (
-			lastTarget        uint64
-			currentSyncHeight = ancestor.Number + 1
+			currentSyncHeight        = ancestor.Number + 1
+			target            uint64 = p.status.Number
 		)
-		target := p.status.Number
 
 		// Stop monitoring the sync progression upon exit
-
 		for {
-			if target == lastTarget {
-				// there are no more changes to pull for now
-				s.logger.Info("exit sync work!")
+			// sync finished
+			if currentSyncHeight+32 > target {
 				return
 			}
+
 			if p.Status() != connectivity.Idle && p.Status() != connectivity.Ready {
 				// there are no more changes to pull for now
 				s.logger.Error("peer error not ready")
 				break
 			}
 
-			stx := time.Now()
-
-			headers, err := getHeaders(
-				p.client,
-				&proto.GetHeadersRequest{
-					Number: int64(currentSyncHeight),
-					Skip:   0,
-					Amount: 190,
-				},
-			)
-			if err != nil {
-				s.logger.Error("header get", "err", err)
-				return
+			// Create the base request skeleton
+			sk := &skeleton{
+				amount: blockAmount,
 			}
-			s.logger.Info("get remote block", "currentSyncHeight", currentSyncHeight, "amount", blockAmount, "elapse", time.Since(stx))
+
+			// Fetch the blocks from the peer
+			if err := sk.getBlocksFromPeer(p.client, currentSyncHeight); err != nil {
+				if rpcErr, ok := grpcstatus.FromError(err); ok {
+					// the data size exceeds grpc server/client message size
+					if rpcErr.Code() == grpccodes.ResourceExhausted {
+						blockAmount /= 2
+
+						continue
+					}
+				}
+				break
+			}
 
 			// increase block amount when succeeded
 			blockAmount++
@@ -349,13 +372,20 @@ func (s *Syncer) SyncWork(ctx context.Context) {
 				blockAmount = maxSkeletonHeadersAmount
 			}
 
-			for _, header := range headers {
-				s.logger.Info("sync block", "block", header)
+			// Verify and write the data locally
+			for _, block := range sk.blocks {
+				s.enqueue.Put(block)
+				s.enqueueCh.In <- struct{}{}
 				currentSyncHeight++
 			}
 
-		}
+			if currentSyncHeight >= target {
+				// Target has been reached
+				break
+			}
 
+			s.logger.Info("sync progress", "current", currentSyncHeight)
+		}
 	}
 }
 

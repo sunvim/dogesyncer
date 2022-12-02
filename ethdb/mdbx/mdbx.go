@@ -32,6 +32,8 @@ var (
 		ethdb.HeadDBI,
 		ethdb.TDDBI,
 		ethdb.ReceiptsDBI,
+		ethdb.SnapDBI,
+		ethdb.QueueDBI,
 	}
 )
 

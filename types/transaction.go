@@ -2,10 +2,12 @@ package types
 
 import (
 	"container/heap"
+	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
 
+	"github.com/dogechain-lab/fastrlp"
 	"github.com/sunvim/dogesyncer/helper/keccak"
 )
 
@@ -138,6 +140,40 @@ func (t *Transaction) IsUnderpriced(priceLimit uint64) bool {
 	return t.GasPrice.Cmp(big.NewInt(0).SetUint64(priceLimit)) < 0
 }
 
+func (t *Transaction) MarshalRLP() []byte {
+	return t.MarshalRLPTo(nil)
+}
+
+func (t *Transaction) MarshalRLPTo(dst []byte) []byte {
+	return MarshalRLPTo(t.MarshalRLPWith, dst)
+}
+
+// MarshalRLPWith marshals the transaction to RLP with a specific fastrlp.Arena
+func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
+	vv := arena.NewArray()
+
+	vv.Set(arena.NewUint(t.Nonce))
+	vv.Set(arena.NewBigInt(t.GasPrice))
+	vv.Set(arena.NewUint(t.Gas))
+
+	// Address may be empty
+	if t.To != nil {
+		vv.Set(arena.NewBytes((*t.To).Bytes()))
+	} else {
+		vv.Set(arena.NewNull())
+	}
+
+	vv.Set(arena.NewBigInt(t.Value))
+	vv.Set(arena.NewCopyBytes(t.Input))
+
+	// signature values
+	vv.Set(arena.NewBigInt(t.V))
+	vv.Set(arena.NewBigInt(t.R))
+	vv.Set(arena.NewBigInt(t.S))
+
+	return vv
+}
+
 // TxByPriceAndTime implements both the sort and the heap interface, making it useful
 // for all at once sorting as well as individually adding and removing elements.
 type TxByPriceAndTime []*Transaction
@@ -242,4 +278,75 @@ func (t *TransactionsByPriceAndNonce) Shift() {
 // and hence all subsequent ones should be discarded from the same account.
 func (t *TransactionsByPriceAndNonce) Pop() {
 	heap.Pop(&t.heads)
+}
+
+func (t *Transaction) UnmarshalRLP(input []byte) error {
+	return UnmarshalRlp(t.UnmarshalRLPFrom, input)
+}
+
+// UnmarshalRLP unmarshals a Transaction in RLP format
+func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
+	elems, err := v.GetElems()
+	if err != nil {
+		return err
+	}
+
+	if len(elems) < 9 {
+		return fmt.Errorf("incorrect number of elements to decode transaction, expected at least 9 but found %d",
+			len(elems))
+	}
+
+	// nonce
+	if t.Nonce, err = elems[0].GetUint64(); err != nil {
+		return err
+	}
+	// gasPrice
+	t.GasPrice = new(big.Int)
+	if err := elems[1].GetBigInt(t.GasPrice); err != nil {
+		return err
+	}
+	// gas
+	if t.Gas, err = elems[2].GetUint64(); err != nil {
+		return err
+	}
+	// to
+	if vv, _ := v.Get(3).Bytes(); len(vv) == 20 {
+		// address
+		addr := BytesToAddress(vv)
+		t.To = &addr
+	} else {
+		// reset To
+		t.To = nil
+	}
+	// value
+	t.Value = new(big.Int)
+	if err := elems[4].GetBigInt(t.Value); err != nil {
+		return err
+	}
+	// input
+	if t.Input, err = elems[5].GetBytes(t.Input[:0]); err != nil {
+		return err
+	}
+
+	// V
+	t.V = new(big.Int)
+	if err = elems[6].GetBigInt(t.V); err != nil {
+		return err
+	}
+
+	// R
+	t.R = new(big.Int)
+	if err = elems[7].GetBigInt(t.R); err != nil {
+		return err
+	}
+	// S
+	t.S = new(big.Int)
+	if err = elems[8].GetBigInt(t.S); err != nil {
+		return err
+	}
+
+	// cache hash
+	t.Hash()
+
+	return nil
 }

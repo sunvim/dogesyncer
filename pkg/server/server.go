@@ -108,7 +108,7 @@ func NewServer(ctx context.Context, config *ServerConfig) (*Server, error) {
 	config.Chain.Genesis.StateRoot = genesisRoot
 
 	// blockchain
-	m.blockchain, err = blockchain.NewBlockchain(logger, db, config.Chain)
+	m.blockchain, err = blockchain.NewBlockchain(logger, db, config.Chain, m.executor)
 	if err != nil {
 		return nil, err
 	}

@@ -8,7 +8,9 @@ var (
 	NumHashDBI  = "numhash"
 	TxesDBI     = "txes"
 	ReceiptsDBI = "receipts"
-	TDDBI       = "td" // total difficulty
+	TDDBI       = "td"    // total difficulty
+	SnapDBI     = "snap"  // consensus snapshot
+	QueueDBI    = "queue" // cache sync block
 )
 
 type Setter interface {
@@ -28,9 +30,14 @@ type Closer interface {
 	Close() error
 }
 
+type Remover interface {
+	Remove(dbi string, k []byte) error
+}
+
 type Database interface {
 	Setter
 	Getter
 	Closer
+	Remover
 	Batch() Batch
 }

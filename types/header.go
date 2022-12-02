@@ -5,8 +5,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"sync/atomic"
 
+	"github.com/dogechain-lab/fastrlp"
 	"github.com/sunvim/dogesyncer/helper/hex"
 )
 
@@ -102,71 +102,120 @@ func (h *Header) Copy() *Header {
 	return newHeader
 }
 
-type Body struct {
-	Transactions []*Transaction
-	Uncles       []*Header
+func (h *Header) MarshalRLP() []byte {
+	return h.MarshalRLPTo(nil)
 }
 
-type Block struct {
-	Header       *Header
-	Transactions []*Transaction
-	Uncles       []*Header
-
-	// Cache
-	size atomic.Value // *uint64
+func (h *Header) MarshalRLPTo(dst []byte) []byte {
+	return MarshalRLPTo(h.MarshalRLPWith, dst)
 }
 
-func (b *Block) Hash() Hash {
-	return b.Header.Hash
+// MarshalRLPWith marshals the header to RLP with a specific fastrlp.Arena
+func (h *Header) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
+	vv := arena.NewArray()
+
+	vv.Set(arena.NewBytes(h.ParentHash.Bytes()))
+	vv.Set(arena.NewBytes(h.Sha3Uncles.Bytes()))
+	vv.Set(arena.NewBytes(h.Miner.Bytes()))
+	vv.Set(arena.NewBytes(h.StateRoot.Bytes()))
+	vv.Set(arena.NewBytes(h.TxRoot.Bytes()))
+	vv.Set(arena.NewBytes(h.ReceiptsRoot.Bytes()))
+	vv.Set(arena.NewCopyBytes(h.LogsBloom[:]))
+
+	vv.Set(arena.NewUint(h.Difficulty))
+	vv.Set(arena.NewUint(h.Number))
+	vv.Set(arena.NewUint(h.GasLimit))
+	vv.Set(arena.NewUint(h.GasUsed))
+	vv.Set(arena.NewUint(h.Timestamp))
+
+	vv.Set(arena.NewCopyBytes(h.ExtraData))
+	vv.Set(arena.NewBytes(h.MixHash.Bytes()))
+	vv.Set(arena.NewCopyBytes(h.Nonce[:]))
+
+	return vv
 }
 
-func (b *Block) Number() uint64 {
-	return b.Header.Number
+func (h *Header) UnmarshalRLP(input []byte) error {
+	return UnmarshalRlp(h.UnmarshalRLPFrom, input)
 }
 
-func (b *Block) ParentHash() Hash {
-	return b.Header.ParentHash
-}
-
-func (b *Block) Body() *Body {
-	return &Body{
-		Transactions: b.Transactions,
-		Uncles:       b.Uncles,
-	}
-}
-
-func (b *Block) Size() uint64 {
-	sizePtr := b.size.Load()
-	if sizePtr == nil {
-		bytes := b.MarshalRLP()
-		size := uint64(len(bytes))
-		b.size.Store(&size)
-
-		return size
-	}
-
-	sizeVal, ok := sizePtr.(*uint64)
-	if !ok {
-		return 0
+func (h *Header) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
+	elems, err := v.GetElems()
+	if err != nil {
+		return err
 	}
 
-	return *sizeVal
-}
-
-func (b *Block) String() string {
-	str := fmt.Sprintf(`Block(#%v):`, b.Number())
-
-	return str
-}
-
-// WithSeal returns a new block with the data from b but the header replaced with
-// the sealed one.
-func (b *Block) WithSeal(header *Header) *Block {
-	cpy := *header
-
-	return &Block{
-		Header:       &cpy,
-		Transactions: b.Transactions,
-		Uncles:       b.Uncles,
+	if len(elems) < 15 {
+		return fmt.Errorf("incorrect number of elements to decode header, expected at least 15 but found %d",
+			len(elems))
 	}
+
+	// parentHash
+	if err = elems[0].GetHash(h.ParentHash[:]); err != nil {
+		return err
+	}
+	// sha3uncles
+	if err = elems[1].GetHash(h.Sha3Uncles[:]); err != nil {
+		return err
+	}
+	// miner
+	if err = elems[2].GetAddr(h.Miner[:]); err != nil {
+		return err
+	}
+	// stateroot
+	if err = elems[3].GetHash(h.StateRoot[:]); err != nil {
+		return err
+	}
+	// txroot
+	if err = elems[4].GetHash(h.TxRoot[:]); err != nil {
+		return err
+	}
+	// receiptroot
+	if err = elems[5].GetHash(h.ReceiptsRoot[:]); err != nil {
+		return err
+	}
+	// logsBloom
+	if _, err = elems[6].GetBytes(h.LogsBloom[:0], 256); err != nil {
+		return err
+	}
+	// difficulty
+	if h.Difficulty, err = elems[7].GetUint64(); err != nil {
+		return err
+	}
+	// number
+	if h.Number, err = elems[8].GetUint64(); err != nil {
+		return err
+	}
+	// gasLimit
+	if h.GasLimit, err = elems[9].GetUint64(); err != nil {
+		return err
+	}
+	// gasused
+	if h.GasUsed, err = elems[10].GetUint64(); err != nil {
+		return err
+	}
+	// timestamp
+	if h.Timestamp, err = elems[11].GetUint64(); err != nil {
+		return err
+	}
+	// extraData
+	if h.ExtraData, err = elems[12].GetBytes(h.ExtraData[:0]); err != nil {
+		return err
+	}
+	// mixHash
+	if err = elems[13].GetHash(h.MixHash[:0]); err != nil {
+		return err
+	}
+	// nonce
+	nonce, err := elems[14].GetUint64()
+	if err != nil {
+		return err
+	}
+
+	h.SetNonce(nonce)
+
+	// compute the hash after the decoding
+	h.ComputeHash()
+
+	return err
 }

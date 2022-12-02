@@ -25,7 +25,6 @@ func Run(cmd *cobra.Command, args []string) {
 	m.logger.Info("start to syncer")
 	syncer := protocol.NewSyncer(m.logger, m.network, m.blockchain)
 	syncer.Start(ctx)
-	go syncer.SyncWork(ctx)
 
 	m.logger.Info("server boot over...")
 	svc.Wait()

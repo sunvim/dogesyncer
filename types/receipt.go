@@ -7,6 +7,7 @@ import (
 
 	goHex "encoding/hex"
 
+	"github.com/dogechain-lab/fastrlp"
 	"github.com/sunvim/dogesyncer/helper/hex"
 	"github.com/sunvim/dogesyncer/helper/keccak"
 )
@@ -46,6 +47,21 @@ type Log struct {
 	Address Address
 	Topics  []Hash
 	Data    []byte
+}
+
+func (l *Log) MarshalRLPWith(a *fastrlp.Arena) *fastrlp.Value {
+	v := a.NewArray()
+	v.Set(a.NewBytes(l.Address.Bytes()))
+
+	topics := a.NewArray()
+	for _, t := range l.Topics {
+		topics.Set(a.NewBytes(t.Bytes()))
+	}
+
+	v.Set(topics)
+	v.Set(a.NewBytes(l.Data))
+
+	return v
 }
 
 const BloomByteLength = 256
@@ -173,4 +189,176 @@ func (b *Bloom) isByteArrPresent(hasher *keccak.Keccak, data []byte) bool {
 	}
 
 	return true
+}
+
+func (r Receipts) MarshalRLPTo(dst []byte) []byte {
+	return MarshalRLPTo(r.MarshalRLPWith, dst)
+}
+
+func (r *Receipts) MarshalRLPWith(a *fastrlp.Arena) *fastrlp.Value {
+	vv := a.NewArray()
+	for _, rr := range *r {
+		vv.Set(rr.MarshalRLPWith(a))
+	}
+
+	return vv
+}
+
+func (r *Receipt) MarshalRLP() []byte {
+	return r.MarshalRLPTo(nil)
+}
+
+func (r *Receipt) MarshalRLPTo(dst []byte) []byte {
+	return MarshalRLPTo(r.MarshalRLPWith, dst)
+}
+
+// MarshalRLPWith marshals a receipt with a specific fastrlp.Arena
+func (r *Receipt) MarshalRLPWith(a *fastrlp.Arena) *fastrlp.Value {
+	vv := a.NewArray()
+	if r.Status != nil {
+		vv.Set(a.NewUint(uint64(*r.Status)))
+	} else {
+		vv.Set(a.NewBytes(r.Root[:]))
+	}
+
+	vv.Set(a.NewUint(r.CumulativeGasUsed))
+	vv.Set(a.NewCopyBytes(r.LogsBloom[:]))
+	vv.Set(r.MarshalLogsWith(a))
+
+	return vv
+}
+
+// MarshalLogsWith marshals the logs of the receipt to RLP with a specific fastrlp.Arena
+func (r *Receipt) MarshalLogsWith(a *fastrlp.Arena) *fastrlp.Value {
+	if len(r.Logs) == 0 {
+		// There are no receipts, write the RLP null array entry
+		return a.NewNullArray()
+	}
+
+	logs := a.NewArray()
+
+	for _, l := range r.Logs {
+		logs.Set(l.MarshalRLPWith(a))
+	}
+
+	return logs
+}
+
+func (r *Receipts) UnmarshalRLP(input []byte) error {
+	return UnmarshalRlp(r.UnmarshalRLPFrom, input)
+}
+
+func (r *Receipts) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
+	elems, err := v.GetElems()
+	if err != nil {
+		return err
+	}
+
+	for _, elem := range elems {
+		rr := &Receipt{}
+		if err := rr.UnmarshalRLPFrom(p, elem); err != nil {
+			return err
+		}
+
+		(*r) = append(*r, rr)
+	}
+
+	return nil
+}
+
+func (r *Receipt) UnmarshalRLP(input []byte) error {
+	return UnmarshalRlp(r.UnmarshalRLPFrom, input)
+}
+
+// UnmarshalRLP unmarshals a Receipt in RLP format
+func (r *Receipt) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
+	elems, err := v.GetElems()
+	if err != nil {
+		return err
+	}
+
+	if len(elems) < 4 {
+		return fmt.Errorf("incorrect number of elements to decode receipt, expected at least 4 but found %d",
+			len(elems))
+	}
+
+	// root or status
+	buf, err := elems[0].Bytes()
+	if err != nil {
+		return err
+	}
+
+	switch size := len(buf); size {
+	case 32:
+		// root
+		copy(r.Root[:], buf[:])
+	case 1:
+		// status
+		r.SetStatus(ReceiptStatus(buf[0]))
+	default:
+		r.SetStatus(0)
+	}
+
+	// cumulativeGasUsed
+	if r.CumulativeGasUsed, err = elems[1].GetUint64(); err != nil {
+		return err
+	}
+	// logsBloom
+	if _, err = elems[2].GetBytes(r.LogsBloom[:0], 256); err != nil {
+		return err
+	}
+
+	// logs
+	logsElems, err := v.Get(3).GetElems()
+	if err != nil {
+		return err
+	}
+
+	for _, elem := range logsElems {
+		log := &Log{}
+		if err := log.UnmarshalRLPFrom(p, elem); err != nil {
+			return err
+		}
+
+		r.Logs = append(r.Logs, log)
+	}
+
+	return nil
+}
+
+func (l *Log) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
+	elems, err := v.GetElems()
+	if err != nil {
+		return err
+	}
+
+	if len(elems) < 3 {
+		return fmt.Errorf("incorrect number of elements to decode log, expected at least 3 but found %d",
+			len(elems))
+	}
+
+	// address
+	if err := elems[0].GetAddr(l.Address[:]); err != nil {
+		return err
+	}
+	// topics
+	topicElems, err := elems[1].GetElems()
+	if err != nil {
+		return err
+	}
+
+	l.Topics = make([]Hash, len(topicElems))
+
+	for indx, topic := range topicElems {
+		if err := topic.GetHash(l.Topics[indx][:]); err != nil {
+			return err
+		}
+	}
+
+	// data
+	if l.Data, err = elems[2].GetBytes(l.Data[:0]); err != nil {
+		return err
+	}
+
+	return nil
 }

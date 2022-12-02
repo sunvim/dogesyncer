@@ -62,3 +62,19 @@ func (d *MdbxDB) Close() error {
 func (d *MdbxDB) Batch() ethdb.Batch {
 	return &KVBatch{env: d.env, dbi: d.dbi}
 }
+
+func (d *MdbxDB) Remove(dbi string, k []byte) error {
+
+	tx := &gmdbx.Tx{}
+	if err := d.env.Begin(tx, gmdbx.TxReadWrite); err != gmdbx.ErrSuccess {
+		return fmt.Errorf("remove open tx failed")
+	}
+	defer tx.Commit()
+
+	key := gmdbx.Bytes(&k)
+	if err := tx.Delete(d.dbi[dbi], &key, &gmdbx.Val{}); err != gmdbx.ErrSuccess {
+		return fmt.Errorf("remove db failed: " + err.Error())
+	}
+
+	return nil
+}
