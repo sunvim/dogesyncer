@@ -11,11 +11,6 @@ import (
 
 var parserPool fastrlp.ParserPool
 
-var (
-	// codePrefix is the code prefix for leveldb
-	codePrefix = []byte("code")
-)
-
 type Storage interface {
 	Set(k, v []byte) error
 	Get(k []byte) ([]byte, bool, error)
@@ -43,7 +38,7 @@ func (kv *KVStorage) Get(k []byte) ([]byte, bool, error) {
 }
 
 func (kv *KVStorage) Close() error {
-	return kv.db.Close()
+	return nil
 }
 
 func (kv *KVStorage) Batch() ethdb.Batch {
@@ -51,13 +46,13 @@ func (kv *KVStorage) Batch() ethdb.Batch {
 }
 
 func (kv *KVStorage) SetCode(hash types.Hash, code []byte) error {
-	return kv.db.Set(ethdb.TrieDBI, append(codePrefix, hash.Bytes()...), code)
+	return kv.db.Set(ethdb.CodeDBI, hash.Bytes(), code)
 }
 
 func (kv *KVStorage) GetCode(hash types.Hash) ([]byte, bool) {
-	rs, ok, _ := kv.db.Get(ethdb.TrieDBI, append(codePrefix, hash.Bytes()...))
+	rs, ok, _ := kv.db.Get(ethdb.CodeDBI, hash.Bytes())
 	if !ok {
-		return []byte{}, false
+		return nil, false
 	}
 	return rs, ok
 }
@@ -81,6 +76,10 @@ func (m *memStorage) Set(p []byte, v []byte) error {
 	copy(buf[:], v[:])
 	m.db[hex.EncodeToHex(p)] = buf
 
+	return nil
+}
+
+func (m *memStorage) Sync() error {
 	return nil
 }
 

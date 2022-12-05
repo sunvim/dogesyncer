@@ -2,26 +2,17 @@ package mdbx
 
 import (
 	"github.com/sunvim/dogesyncer/ethdb"
-	"github.com/sunvim/gmdbx"
+	"github.com/torquem-ch/mdbx-go/mdbx"
 )
 
 type MdbxDB struct {
 	path string
-	env  *gmdbx.Env
-	dbi  map[string]gmdbx.DBI
+	env  *mdbx.Env
+	dbi  map[string]mdbx.DBI
 }
 
 var (
-	defaultGeometry = gmdbx.Geometry{
-		SizeLower:       1 << 24,
-		SizeNow:         1 << 24,
-		SizeUpper:       1 << 43,
-		GrowthStep:      1 << 25,
-		ShrinkThreshold: 1 << 26,
-		PageSize:        1 << 16,
-	}
-
-	defaultFlags = gmdbx.EnvSyncDurable | gmdbx.EnvNoReadAhead | gmdbx.EnvCoalesce
+	defaultFlags = mdbx.Durable | mdbx.NoReadahead | mdbx.Coalesce
 
 	dbis = []string{
 		ethdb.BodyDBI,
@@ -34,84 +25,83 @@ var (
 		ethdb.ReceiptsDBI,
 		ethdb.SnapDBI,
 		ethdb.QueueDBI,
+		ethdb.CodeDBI,
 	}
 )
 
 func NewMDBX(path string) *MdbxDB {
 
-	env, err := gmdbx.NewEnv()
-	if err != gmdbx.ErrSuccess {
+	env, err := mdbx.NewEnv()
+	if err != nil {
 		panic(err)
 	}
 
-	if err := env.SetOption(gmdbx.OptMaxDB, 32); err != gmdbx.ErrSuccess {
+	if err := env.SetOption(mdbx.OptMaxDB, 32); err != nil {
 		panic(err)
 	}
 
-	if err := env.SetOption(gmdbx.OptRpAugmentLimit, 0x7fffFFFF); err != gmdbx.ErrSuccess {
+	if err := env.SetOption(mdbx.OptRpAugmentLimit, 0x7fffFFFF); err != nil {
 		panic(err)
 	}
 
-	if err := env.SetOption(gmdbx.OptMaxReaders, 32000); err != gmdbx.ErrSuccess {
+	if err := env.SetOption(mdbx.OptMaxReaders, 32000); err != nil {
 		panic(err)
 	}
 
-	if err = env.SetOption(gmdbx.OptMergeThreshold16Dot16Percent, 32768); err != gmdbx.ErrSuccess {
+	if err = env.SetOption(mdbx.OptMergeThreshold16dot16Percent, 32768); err != nil {
 		panic(err)
 	}
 
-	txnDpInitial, err := env.GetOption(gmdbx.OptTxnDpInitial)
-	if err != gmdbx.ErrSuccess {
+	txnDpInitial, err := env.GetOption(mdbx.OptTxnDpInitial)
+	if err != nil {
 		panic(err)
 	}
-	if err = env.SetOption(gmdbx.OptTxnDpInitial, txnDpInitial*2); err != gmdbx.ErrSuccess {
-		panic(err)
-	}
-
-	dpReserveLimit, err := env.GetOption(gmdbx.OptDpReserveLimit)
-	if err != gmdbx.ErrSuccess {
-		panic(err)
-	}
-	if err = env.SetOption(gmdbx.OptDpReserveLimit, dpReserveLimit*2); err != gmdbx.ErrSuccess {
+	if err = env.SetOption(mdbx.OptTxnDpInitial, txnDpInitial*2); err != nil {
 		panic(err)
 	}
 
-	defaultDirtyPagesLimit, err := env.GetOption(gmdbx.OptTxnDpLimit)
-	if err != gmdbx.ErrSuccess {
+	dpReserveLimit, err := env.GetOption(mdbx.OptDpReverseLimit)
+	if err != nil {
 		panic(err)
 	}
-	if err = env.SetOption(gmdbx.OptTxnDpLimit, defaultDirtyPagesLimit*2); err != gmdbx.ErrSuccess { // default is RAM/42
-		panic(err)
-	}
-
-	if err := env.SetGeometry(defaultGeometry); err != gmdbx.ErrSuccess {
+	if err = env.SetOption(mdbx.OptDpReverseLimit, dpReserveLimit*2); err != nil {
 		panic(err)
 	}
 
-	if err = env.Open(path, defaultFlags, 0664); err != gmdbx.ErrSuccess {
+	defaultDirtyPagesLimit, err := env.GetOption(mdbx.OptTxnDpLimit)
+	if err != nil {
+		panic(err)
+	}
+	if err = env.SetOption(mdbx.OptTxnDpLimit, defaultDirtyPagesLimit*2); err != nil { // default is RAM/42
+		panic(err)
+	}
+
+	if err := env.SetGeometry(1<<24, 1<<24, 1<<43, 1<<25, 1<<26, 1<<16); err != nil {
+		panic(err)
+	}
+
+	if err = env.Open(path, uint(defaultFlags), 0664); err != nil {
 		panic(err)
 	}
 
 	d := &MdbxDB{
 		path: path,
-		dbi:  make(map[string]gmdbx.DBI),
+		dbi:  make(map[string]mdbx.DBI),
 	}
 	d.env = env
 
-	tx := &gmdbx.Tx{}
-	if err = env.Begin(tx, gmdbx.TxReadWrite); err != gmdbx.ErrSuccess {
-		panic(err)
-	}
-	defer tx.Commit()
-
-	// create or open all dbi
-	for _, dbiName := range dbis {
-		dbi, err := tx.OpenDBI(dbiName, gmdbx.DBCreate)
-		if err != gmdbx.ErrSuccess {
-			panic(err)
+	env.Update(func(txn *mdbx.Txn) error {
+		// create or open all dbi
+		for _, dbiName := range dbis {
+			dbi, err := txn.CreateDBI(dbiName)
+			if err != nil {
+				panic(err)
+			}
+			d.dbi[dbiName] = dbi
 		}
-		d.dbi[dbiName] = dbi
-	}
+		return nil
+
+	})
 
 	return d
 }

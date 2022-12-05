@@ -1,10 +1,9 @@
 package mdbx
 
 import (
-	"errors"
-	"fmt"
+	"runtime"
 
-	"github.com/sunvim/gmdbx"
+	"github.com/torquem-ch/mdbx-go/mdbx"
 )
 
 type keyvalue struct {
@@ -15,8 +14,8 @@ type keyvalue struct {
 
 // KVBatch is a batch write for leveldb
 type KVBatch struct {
-	env    *gmdbx.Env
-	dbi    map[string]gmdbx.DBI
+	env    *mdbx.Env
+	dbi    map[string]mdbx.DBI
 	writes []keyvalue
 	size   int
 }
@@ -40,30 +39,23 @@ func (b *KVBatch) Set(dbi string, k, v []byte) error {
 // why no error handle
 func (b *KVBatch) Write() error {
 
-	tx := &gmdbx.Tx{}
-	if err := b.env.Begin(tx, gmdbx.TxReadWrite); err != gmdbx.ErrSuccess {
-		return fmt.Errorf("open tx failed %s", err.Error())
-	}
-	defer tx.Commit()
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 
-	var (
-		err      gmdbx.Error
-		key, val gmdbx.Val
-	)
+	tx, err := b.env.BeginTxn(&mdbx.Txn{}, 0)
+	if err != nil {
+		panic(err)
+	}
+
+	defer func() {
+		tx.Commit()
+		b.env.Sync(true, false)
+	}()
 
 	for _, keyvalue := range b.writes {
-
-		key = gmdbx.Bytes(&keyvalue.key)
-
-		if keyvalue.value == nil {
-			err = tx.Put(b.dbi[keyvalue.dbi], &key, &gmdbx.Val{}, gmdbx.PutUpsert)
-		} else {
-			val = gmdbx.Bytes(&keyvalue.value)
-			err = tx.Put(b.dbi[keyvalue.dbi], &key, &val, gmdbx.PutUpsert)
-		}
-
-		if err != gmdbx.ErrSuccess {
-			return errors.New("insert failed: " + err.Error())
+		err = tx.Put(b.dbi[keyvalue.dbi], keyvalue.key, keyvalue.value, 0)
+		if err != nil {
+			panic(err)
 		}
 	}
 

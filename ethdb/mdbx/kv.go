@@ -1,61 +1,59 @@
 package mdbx
 
 import (
-	"fmt"
-
 	"github.com/sunvim/dogesyncer/ethdb"
-	"github.com/sunvim/gmdbx"
+	"github.com/torquem-ch/mdbx-go/mdbx"
 )
 
 func (d *MdbxDB) Set(dbi string, k []byte, v []byte) error {
 
-	tx := &gmdbx.Tx{}
-	if err := d.env.Begin(tx, gmdbx.TxReadWrite); err != gmdbx.ErrSuccess {
-		return fmt.Errorf("open tx failed")
-	}
-	defer tx.Commit()
-
-	key, val := gmdbx.Bytes(&k), gmdbx.Bytes(&v)
-	if err := tx.Put(d.dbi[dbi], &key, &val, gmdbx.PutUpsert); err != gmdbx.ErrSuccess {
-		return fmt.Errorf("insert db failed: " + err.Error())
-	}
+	d.env.Update(func(txn *mdbx.Txn) error {
+		txn.Put(d.dbi[dbi], k, v, mdbx.Upsert)
+		return nil
+	})
 
 	return nil
 }
 
 func (d *MdbxDB) Get(dbi string, k []byte) ([]byte, bool, error) {
+	var (
+		v []byte
+		r bool
+		e error
+	)
 
-	tx := &gmdbx.Tx{}
+	e = d.env.View(func(txn *mdbx.Txn) error {
 
-	if err := d.env.Begin(tx, gmdbx.TxReadOnly); err != gmdbx.ErrSuccess {
-		return nil, false, fmt.Errorf("open tx failed")
-	}
-	defer tx.Commit()
-
-	key := gmdbx.Bytes(&k)
-
-	val := gmdbx.Val{}
-	err := tx.Get(d.dbi[dbi], &key, &val)
-	if err != gmdbx.ErrSuccess {
-		if err != gmdbx.ErrNotFound {
-			return nil, false, fmt.Errorf("get failed: " + err.Error())
+		v, e = txn.Get(d.dbi[dbi], k)
+		if e != nil {
+			return e
 		}
-		return nil, false, nil
+		return nil
+	})
+
+	if e != nil {
+		if e == mdbx.NotFound {
+			e = nil
+			r = false
+		}
+	} else {
+		r = true
 	}
 
-	return val.Bytes(), true, nil
+	return v, r, e
+}
 
+func (d *MdbxDB) Sync() error {
+	d.env.Sync(true, false)
+	return nil
 }
 
 func (d *MdbxDB) Close() error {
-
-	for _, v := range d.dbi {
-		d.env.CloseDBI(v)
+	d.env.Sync(true, false)
+	for _, dbi := range d.dbi {
+		d.env.CloseDBI(dbi)
 	}
-	if err := d.env.Close(false); err != gmdbx.ErrSuccess {
-		return fmt.Errorf("close db failed: %s ", err.Error())
-	}
-
+	d.env.Close()
 	return nil
 }
 
@@ -64,17 +62,7 @@ func (d *MdbxDB) Batch() ethdb.Batch {
 }
 
 func (d *MdbxDB) Remove(dbi string, k []byte) error {
-
-	tx := &gmdbx.Tx{}
-	if err := d.env.Begin(tx, gmdbx.TxReadWrite); err != gmdbx.ErrSuccess {
-		return fmt.Errorf("remove open tx failed")
-	}
-	defer tx.Commit()
-
-	key := gmdbx.Bytes(&k)
-	if err := tx.Delete(d.dbi[dbi], &key, &gmdbx.Val{}); err != gmdbx.ErrSuccess {
-		return fmt.Errorf("remove db failed: " + err.Error())
-	}
-
-	return nil
+	return d.env.Update(func(txn *mdbx.Txn) error {
+		return txn.Del(d.dbi[dbi], k, nil)
+	})
 }

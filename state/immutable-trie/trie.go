@@ -249,11 +249,15 @@ func (t *Trie) Txn() *Txn {
 	return &Txn{root: t.root, epoch: t.epoch + 1, storage: t.storage}
 }
 
+type Putter interface {
+	Set(k, v []byte)
+}
+
 type Txn struct {
 	root    Node
 	epoch   uint32
 	storage Storage
-	batch   ethdb.Setter
+	batch   ethdb.Batch
 }
 
 func (t *Txn) Commit() *Trie {

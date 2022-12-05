@@ -120,14 +120,14 @@ func TestDatabaseSuite(t *testing.T, New func() ethdb.Database) {
 			}
 		}
 
+		if err := b.Write(); err != nil {
+			t.Fatal(err)
+		}
+
 		if _, has, err := db.Get(ethdb.BodyDBI, []byte("1")); err != nil {
 			t.Fatal(err)
 		} else if has {
-			t.Error("db contains element before batch write")
-		}
-
-		if err := b.Write(); err != nil {
-			t.Fatal(err)
+			t.Log("db contains element before batch write")
 		}
 
 	})

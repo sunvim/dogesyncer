@@ -1,5 +1,7 @@
 package ethdb
 
+import "fmt"
+
 var (
 	TrieDBI     = "trie"
 	BodyDBI     = "block"
@@ -11,6 +13,11 @@ var (
 	TDDBI       = "td"    // total difficulty
 	SnapDBI     = "snap"  // consensus snapshot
 	QueueDBI    = "queue" // cache sync block
+	CodeDBI     = "code"  // save contract code
+)
+
+var (
+	ErrNotFound = fmt.Errorf("Not Found")
 )
 
 type Setter interface {
@@ -34,10 +41,15 @@ type Remover interface {
 	Remove(dbi string, k []byte) error
 }
 
+type Syncer interface {
+	Sync() error
+}
+
 type Database interface {
 	Setter
 	Getter
 	Closer
 	Remover
+	Syncer
 	Batch() Batch
 }

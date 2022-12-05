@@ -113,6 +113,8 @@ func NewServer(ctx context.Context, config *ServerConfig) (*Server, error) {
 		return nil, err
 	}
 
+	m.executor.GetHash = m.blockchain.GetHashHelper
+
 	err = m.blockchain.HandleGenesis()
 	if err != nil {
 		return nil, err
@@ -215,12 +217,12 @@ func (s *Server) Close() error {
 	}
 	s.logger.Info("network close over")
 
-	s.logger.Info("closing storage...")
+	s.logger.Info("closing blockchain...")
 	// Close the state storage
-	if err := s.stateStorage.Close(); err != nil {
-		s.logger.Error("failed to close storage for trie", "err", err.Error())
+	if err := s.blockchain.Close(); err != nil {
+		s.logger.Error("failed to close blockchain", "err", err)
 	}
-	s.logger.Info("close storage over")
+	s.logger.Info("close blockchain over")
 
 	return nil
 

@@ -179,8 +179,8 @@ func ReadTransaction(db ethdb.Database, hash types.Hash) (*types.Transaction, er
 func WrteReceipts(db ethdb.Database, receipts types.Receipts) error {
 	batch := db.Batch()
 
-	for _, tx := range receipts {
-		err := batch.Set(ethdb.TxesDBI, tx.TxHash.Bytes(), tx.MarshalRLPTo(nil))
+	for _, rx := range receipts {
+		err := batch.Set(ethdb.ReceiptsDBI, rx.TxHash.Bytes(), rx.MarshalRLPTo(nil))
 		if err != nil {
 			return err
 		}

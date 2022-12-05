@@ -63,8 +63,10 @@ func (s *serviceV1) Notify(ctx context.Context, req *proto.NotifyReq) (*empty.Em
 		return nil, err
 	}
 
-	s.syncer.enqueueBlock(id, b)
-	s.syncer.updatePeerStatus(id, status)
+	if s.syncer.stxRecv {
+		s.syncer.enqueueBlock(id, b)
+		s.syncer.updatePeerStatus(id, status)
+	}
 
 	return &empty.Empty{}, nil
 }

@@ -26,11 +26,12 @@ require (
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.14.0
 	github.com/stretchr/testify v1.8.1
-	github.com/sunvim/gmdbx v0.0.3
 	github.com/sunvim/utils v0.1.0
+	github.com/torquem-ch/mdbx-go v0.26.3
 	github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b
+	github.com/umbracle/go-web3 v0.0.0-20220224145938-aaa1038c1b69
 	github.com/vmihailenco/msgpack/v5 v5.3.5
-	golang.org/x/crypto v0.3.0
+	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e
 	google.golang.org/grpc v1.51.0
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce
@@ -148,6 +149,8 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/subosito/gotenv v1.4.1 // indirect
+	github.com/umbracle/fastrlp v0.0.0-20220527094140-59d5dd30e722 // indirect
+	github.com/valyala/fastjson v1.6.3 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	github.com/whyrusleeping/timecache v0.0.0-20160911033111-cfcb2f1abfee // indirect
 	go.uber.org/atomic v1.10.0 // indirect

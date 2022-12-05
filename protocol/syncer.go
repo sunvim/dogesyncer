@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/cornelk/hashmap"
@@ -71,13 +70,14 @@ type Syncer struct {
 	// save new block info from remote peer
 	enqueue   *pq.PriorityQueue
 	enqueueCh *chanx.UnboundedChan[struct{}]
+	stxRecv   bool
+	onceSend  *sync.Once
 }
 
 // NewSyncer creates a new Syncer instance
-func NewSyncer(logger hclog.Logger, server *network.Server, blockchain blockchainShim) *Syncer {
+func NewSyncer(logger hclog.Logger, server *network.Server, blockchain blockchainShim, datadir string) *Syncer {
 
 	const defQueueSize = 819200
-
 	s := &Syncer{
 		logger:          logger.Named(_syncerName),
 		stopCh:          make(chan struct{}),
@@ -87,6 +87,7 @@ func NewSyncer(logger hclog.Logger, server *network.Server, blockchain blockchai
 		peers:           hashmap.New[peer.ID, *SyncPeer](),
 		enqueue:         pq.NewPriorityQueue(defQueueSize, false),
 		enqueueCh:       chanx.NewUnboundedChan[struct{}](defQueueSize),
+		onceSend:        &sync.Once{},
 	}
 
 	return s
@@ -154,7 +155,6 @@ func (s *Syncer) updateStatus(status *Status) {
 // enqueueBlock adds the specific block to the peerID queue
 func (s *Syncer) enqueueBlock(peerID peer.ID, b *types.Block) {
 	s.logger.Debug("enqueue block", "peer", peerID, "number", b.Number(), "hash", b.Hash())
-
 	s.enqueue.Put(b)
 	s.enqueueCh.In <- struct{}{}
 }
@@ -266,35 +266,33 @@ func (s *Syncer) Start(ctx context.Context) {
 }
 
 func (s *Syncer) WatchSync(ctx context.Context) {
+	defer s.logger.Info("exit handle new block")
 
-	for {
-		time.Sleep(5 * time.Second)
-		item := s.enqueue.Peek()
-		if item == nil {
-			continue
-		}
-		num := item.(*types.Block).Number()
-
-		curHeight := s.blockchain.Header().Number
-		if curHeight+1 == num {
-			break
-		}
-	}
+	var (
+		newblock = &types.Block{}
+	)
 
 	for {
 		select {
 		case <-s.enqueueCh.Out:
-			// drop them before finish evm compatiable
 			items, err := s.enqueue.Get(1)
 			if err != nil {
 				s.logger.Error("watch sync", "err", err)
 				continue
 			}
-			newblock := items[0].(*types.Block)
+			newblock = items[0].(*types.Block)
+			if err = s.blockchain.VerifyFinalizedBlock(newblock); err != nil {
+				if err == blockchain.ErrExistBlock {
+					continue
+				}
+				s.logger.Error("verify block", "err", err)
+				return
+			}
+
 			err = s.blockchain.WriteBlock(newblock)
 			if err != nil {
 				s.logger.Error("handle new block", "err", err)
-				syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+				return
 			}
 		}
 	}
@@ -374,19 +372,26 @@ func (s *Syncer) SyncWork(ctx context.Context) {
 
 			// Verify and write the data locally
 			for _, block := range sk.blocks {
+
 				s.enqueue.Put(block)
 				s.enqueueCh.In <- struct{}{}
+
 				currentSyncHeight++
 			}
 
 			if currentSyncHeight >= target {
 				// Target has been reached
+				s.StartToRecieveNewBlock()
 				break
 			}
-
-			s.logger.Info("sync progress", "current", currentSyncHeight)
 		}
 	}
+}
+
+func (s *Syncer) StartToRecieveNewBlock() {
+	s.onceSend.Do(func() {
+		s.stxRecv = true
+	})
 }
 
 // setupPeers adds connected peers as syncer peers

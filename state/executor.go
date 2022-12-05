@@ -10,6 +10,8 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/sunvim/dogesyncer/chain"
+	"github.com/sunvim/dogesyncer/contracts/bridge"
+	"github.com/sunvim/dogesyncer/contracts/systemcontracts"
 	"github.com/sunvim/dogesyncer/crypto"
 	"github.com/sunvim/dogesyncer/state/runtime"
 	"github.com/sunvim/dogesyncer/state/runtime/evm"
@@ -369,10 +371,67 @@ func (t *Transition) Write(txn *types.Transaction) error {
 		receipt.ContractAddress = crypto.CreateAddress(msg.From, txn.Nonce).Ptr()
 	}
 
+	// handle cross bridge logs from|to dogecoin blockchain
+	if err := t.handleBridgeLogs(msg, logs); err != nil {
+		return err
+	}
+
 	// Set the receipt logs and create a bloom for filtering
 	receipt.Logs = logs
 	receipt.LogsBloom = types.CreateBloom([]*types.Receipt{receipt})
 	t.receipts = append(t.receipts, receipt)
+
+	return nil
+}
+
+func (t *Transition) handleBridgeLogs(msg *types.Transaction, logs []*types.Log) error {
+	// filter bridge contract logs
+	if len(logs) == 0 ||
+		msg.To == nil ||
+		*msg.To != systemcontracts.AddrBridgeContract {
+		return nil
+	}
+
+	for _, log := range logs {
+		if len(log.Topics) == 0 {
+			continue
+		}
+
+		switch log.Topics[0] {
+		case bridge.BridgeDepositedEventID:
+			parsedLog, err := bridge.ParseBridgeDepositedLog(log)
+			if err != nil {
+				return err
+			}
+
+			t.state.AddBalance(parsedLog.Receiver, parsedLog.Amount)
+		case bridge.BridgeWithdrawnEventID:
+			parsedLog, err := bridge.ParseBridgeWithdrawnLog(log)
+			if err != nil {
+				return err
+			}
+
+			// the total one is the real amount of Withdrawn event
+			realAmount := big.NewInt(0).Add(parsedLog.Amount, parsedLog.Fee)
+
+			if err := t.state.SubBalance(parsedLog.Contract, realAmount); err != nil {
+				return err
+			}
+
+			// the fee goes to system Vault contract
+			t.state.AddBalance(systemcontracts.AddrVaultContract, parsedLog.Fee)
+		case bridge.BridgeBurnedEventID:
+			parsedLog, err := bridge.ParseBridgeBurnedLog(log)
+			if err != nil {
+				return err
+			}
+
+			// burn
+			if err := t.state.SubBalance(parsedLog.Sender, parsedLog.Amount); err != nil {
+				return err
+			}
+		}
+	}
 
 	return nil
 }
