@@ -183,11 +183,12 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 	b.wg.Add(1)
 	defer b.wg.Done()
 
+	// nil checked by verify functions
+	header := block.Header
+
 	// Log the information
 	b.logger.Info("write block", "num", block.Number(), "parent", block.ParentHash())
 
-	// nil checked by verify functions
-	header := block.Header
 	// write body
 	if err := b.writeBody(block); err != nil {
 		return err

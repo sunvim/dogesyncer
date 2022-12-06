@@ -4,6 +4,7 @@ import (
 	"math/big"
 
 	"github.com/sunvim/dogesyncer/blockchain"
+	"github.com/sunvim/dogesyncer/ethdb"
 	"github.com/sunvim/dogesyncer/types"
 )
 
@@ -18,6 +19,7 @@ type blockchainShim interface {
 	GetBodyByHash(types.Hash) (*types.Body, bool)
 	GetHeaderByHash(types.Hash) (*types.Header, bool)
 	GetHeaderByNumber(n uint64) (*types.Header, bool)
+	ChainDB() ethdb.Database
 
 	// advance chain methods
 	WriteBlock(block *types.Block) error

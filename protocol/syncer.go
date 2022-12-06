@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
 	"sync"
 	"time"
 
@@ -155,6 +156,11 @@ func (s *Syncer) updateStatus(status *Status) {
 // enqueueBlock adds the specific block to the peerID queue
 func (s *Syncer) enqueueBlock(peerID peer.ID, b *types.Block) {
 	s.logger.Debug("enqueue block", "peer", peerID, "number", b.Number(), "hash", b.Hash())
+
+	if s.blockchain.Header().Number >= b.Number() {
+		return
+	}
+
 	s.enqueue.Put(b)
 	s.enqueueCh.In <- struct{}{}
 }
@@ -281,18 +287,19 @@ func (s *Syncer) WatchSync(ctx context.Context) {
 				continue
 			}
 			newblock = items[0].(*types.Block)
+
 			if err = s.blockchain.VerifyFinalizedBlock(newblock); err != nil {
 				if err == blockchain.ErrExistBlock {
 					continue
 				}
 				s.logger.Error("verify block", "err", err)
-				return
+				os.Exit(1)
 			}
 
 			err = s.blockchain.WriteBlock(newblock)
 			if err != nil {
 				s.logger.Error("handle new block", "err", err)
-				return
+				os.Exit(1)
 			}
 		}
 	}
