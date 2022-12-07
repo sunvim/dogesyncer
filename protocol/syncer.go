@@ -304,6 +304,10 @@ func (s *Syncer) WatchSync(ctx context.Context) {
 	}
 }
 
+const (
+	syncFinishedSize = 16
+)
+
 // number: 687 have tx
 func (s *Syncer) SyncWork(ctx context.Context) {
 	s.logger.Info("starting to sync block ...")
@@ -330,7 +334,11 @@ func (s *Syncer) SyncWork(ctx context.Context) {
 		}
 
 		s.logger.Info("fork found", "ancestor", ancestor.Number, "target", p.status.Number, "peer", p.ID())
-		// start to sync block
+
+		// start to revieve new block
+		if ancestor.Number+syncFinishedSize > p.status.Number {
+			s.StartToRecieveNewBlock()
+		}
 
 		// dynamic modifying syncing size
 		blockAmount := int64(maxSkeletonHeadersAmount)
@@ -342,7 +350,7 @@ func (s *Syncer) SyncWork(ctx context.Context) {
 		// Stop monitoring the sync progression upon exit
 		for {
 			// sync finished
-			if currentSyncHeight+32 > target {
+			if currentSyncHeight == target {
 				return
 			}
 
@@ -383,12 +391,6 @@ func (s *Syncer) SyncWork(ctx context.Context) {
 				s.enqueueCh.In <- struct{}{}
 
 				currentSyncHeight++
-			}
-
-			if currentSyncHeight >= target {
-				// Target has been reached
-				s.StartToRecieveNewBlock()
-				break
 			}
 		}
 	}
