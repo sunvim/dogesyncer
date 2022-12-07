@@ -20,7 +20,6 @@ import (
 	libp2pGrpc "github.com/sunvim/dogesyncer/network/grpc"
 	"github.com/sunvim/dogesyncer/protocol/proto"
 	"github.com/sunvim/dogesyncer/types"
-	pq "github.com/sunvim/utils/priorityqueue"
 	grpccodes "google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
 	grpcstatus "google.golang.org/grpc/status"
@@ -69,7 +68,7 @@ type Syncer struct {
 	syncProgression *progress.ProgressionWrapper
 
 	// save new block info from remote peer
-	enqueue   *pq.PriorityQueue
+	enqueue   *PriorityQueue
 	enqueueCh *chanx.UnboundedChan[struct{}]
 	stxRecv   bool
 	onceSend  *sync.Once
@@ -86,7 +85,7 @@ func NewSyncer(logger hclog.Logger, server *network.Server, blockchain blockchai
 		server:          server,
 		syncProgression: progress.NewProgressionWrapper(progress.ChainSyncBulk),
 		peers:           hashmap.New[peer.ID, *SyncPeer](),
-		enqueue:         pq.NewPriorityQueue(defQueueSize, false),
+		enqueue:         NewPriorityQueue(defQueueSize, false),
 		enqueueCh:       chanx.NewUnboundedChan[struct{}](defQueueSize),
 		onceSend:        &sync.Once{},
 	}
@@ -286,7 +285,7 @@ func (s *Syncer) WatchSync(ctx context.Context) {
 				s.logger.Error("watch sync", "err", err)
 				continue
 			}
-			newblock = items[0].(*types.Block)
+			newblock = items[0]
 
 			if err = s.blockchain.VerifyFinalizedBlock(newblock); err != nil {
 				if err == blockchain.ErrExistBlock {

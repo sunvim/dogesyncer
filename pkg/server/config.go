@@ -16,6 +16,8 @@ type Config struct {
 	DataDir           string   `json:"data_dir"`
 	BlockGasTarget    string   `json:"block_gas_target"`
 	GRPCAddr          string   `json:"grpc_addr"`
+	HttpAddr          string   `json:"rpc_addr"`
+	HttpPort          string   `json:"rpc_port"`
 	Network           *Network `json:"network"`
 	LogLevel          string   `json:"log_level"`
 	BlockTime         uint64   `json:"block_time_s"`
@@ -30,6 +32,8 @@ func DefaultConfig() *Config {
 		DataDir:        "dogechain",
 		BlockGasTarget: "0x00",
 		LogLevel:       "INFO",
+		HttpAddr:       "127.0.0.1",
+		HttpPort:       "8545",
 		BlockTime:      2,
 		Network: &Network{
 			NoDiscover:       defaultNetworkConfig.NoDiscover,
@@ -66,6 +70,8 @@ type ServerConfig struct {
 	EnableGraphQL bool
 	GRPCAddr      *net.TCPAddr
 	LibP2PAddr    *net.TCPAddr
+	RpcAddr       string
+	RpcPort       string
 
 	PriceLimit            uint64
 	MaxSlots              uint64

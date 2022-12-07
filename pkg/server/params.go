@@ -48,6 +48,8 @@ const (
 	jsonRPCBatchRequestLimitFlag = "json-rpc-batch-request-limit"
 	jsonRPCBlockRangeLimitFlag   = "json-rpc-block-range-limit"
 	jsonrpcNamespaceFlag         = "json-rpc-namespace"
+	JsonrpcAddress               = "http.addr"
+	JsonrpcPort                  = "http.port"
 	enableWSFlag                 = "enable-ws"
 )
 
@@ -179,6 +181,14 @@ func (p *serverParams) setRawGRPCAddress(grpcAddress string) {
 	p.rawConfig.GRPCAddr = grpcAddress
 }
 
+func (p *serverParams) setRawRpcAddress(rpcAddress string) {
+	p.rawConfig.HttpAddr = rpcAddress
+}
+
+func (p *serverParams) setRawRpcPort(rpcPort string) {
+	p.rawConfig.HttpPort = rpcPort
+}
+
 func (p *serverParams) generateConfig() *ServerConfig {
 	chainCfg := p.genesisConfig
 
@@ -193,6 +203,8 @@ func (p *serverParams) generateConfig() *ServerConfig {
 		Chain:      chainCfg,
 		GRPCAddr:   p.grpcAddress,
 		LibP2PAddr: p.libp2pAddress,
+		RpcAddr:    p.rawConfig.HttpAddr,
+		RpcPort:    p.rawConfig.HttpPort,
 		Network: &network.Config{
 			NoDiscover:       p.rawConfig.Network.NoDiscover,
 			Addr:             p.libp2pAddress,

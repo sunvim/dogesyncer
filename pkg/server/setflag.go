@@ -19,6 +19,21 @@ func SetFlags(cmd *cobra.Command) {
 		)
 	}
 
+	// rpc & ws
+
+	{
+		cmd.Flags().String(
+			JsonrpcAddress,
+			"127.0.0.1",
+			"rpc address",
+		)
+		cmd.Flags().String(
+			JsonrpcPort,
+			"8545",
+			"rpc port",
+		)
+	}
+
 	// basic flags
 	{
 		cmd.Flags().StringVar(
