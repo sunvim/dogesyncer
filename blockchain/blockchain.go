@@ -100,6 +100,17 @@ func (b *Blockchain) isStopped() bool {
 	return b.stopped.Load()
 }
 
+func (b *Blockchain) SelfCheck() {
+	latest, _ := rawdb.ReadHeadHash(b.chaindb)
+	header, _ := rawdb.ReadHeader(b.chaindb, latest)
+	_, ok := rawdb.ReadCanonicalHash(b.chaindb, header.Number)
+	if !ok { // missing latest header
+		reset(b.chaindb)
+		return
+	}
+	return
+}
+
 func (b *Blockchain) CurrentTD() *big.Int {
 	td, ok := b.currentDifficulty.Load().(*big.Int)
 	if !ok {
@@ -632,6 +643,8 @@ func (b *Blockchain) ChainDB() ethdb.Database {
 
 func (b *Blockchain) HandleGenesis() error {
 
+	b.SelfCheck()
+
 	head, ok := rawdb.ReadHeadHash(b.chaindb)
 	if ok { // non empty storage
 		genesis, ok := rawdb.ReadCanonicalHash(b.chaindb, 0)
@@ -642,11 +655,11 @@ func (b *Blockchain) HandleGenesis() error {
 		if genesis != b.config.Genesis.Hash() {
 			return fmt.Errorf("genesis file does not match current genesis")
 		}
+
 		header, err := rawdb.ReadHeader(b.chaindb, head)
 		if err != nil {
 			return fmt.Errorf("failed to get header with hash %s err: %v", head.String(), err)
 		}
-
 		b.logger.Info("current header", "hash", head.String(), "number", header.Number)
 
 		b.setCurHeader(header, header.Difficulty)

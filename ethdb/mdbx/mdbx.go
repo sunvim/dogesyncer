@@ -76,7 +76,7 @@ func NewMDBX(path string) *MdbxDB {
 		panic(err)
 	}
 
-	if err := env.SetGeometry(1<<24, 1<<24, 1<<43, 1<<25, 1<<26, 1<<16); err != nil {
+	if err := env.SetGeometry(1<<30, 1<<30, 1<<43, 1<<30, 1<<31, 1<<16); err != nil {
 		panic(err)
 	}
 

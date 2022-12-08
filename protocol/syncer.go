@@ -330,6 +330,7 @@ func (s *Syncer) SyncWork(ctx context.Context) {
 
 		// return error
 		if err != nil {
+			s.logger.Error("find peer", "err", err)
 			continue
 		}
 
@@ -347,12 +348,13 @@ func (s *Syncer) SyncWork(ctx context.Context) {
 			target            uint64 = p.status.Number
 		)
 
+		// sync finished
+		if currentSyncHeight == target {
+			return
+		}
+
 		// Stop monitoring the sync progression upon exit
 		for {
-			// sync finished
-			if currentSyncHeight == target {
-				return
-			}
 
 			if p.Status() != connectivity.Idle && p.Status() != connectivity.Ready {
 				// there are no more changes to pull for now
@@ -392,6 +394,11 @@ func (s *Syncer) SyncWork(ctx context.Context) {
 
 				currentSyncHeight++
 			}
+
+			if currentSyncHeight == target {
+				break
+			}
+
 		}
 	}
 }
