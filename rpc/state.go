@@ -1,5 +1,7 @@
 package rpc
 
-func GetBalance(method string, params ...interface{}) []byte {
+// not support "earliest" and "pending"
+func (s *RpcServer) GetBalance(method string, params ...any) any {
+
 	return nil
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/sunvim/dogesyncer/helper/common"
 	"github.com/sunvim/dogesyncer/rawdb"
 	"github.com/sunvim/dogesyncer/state"
+	itrie "github.com/sunvim/dogesyncer/state/immutable-trie"
 	"github.com/sunvim/dogesyncer/types"
 	"github.com/sunvim/dogesyncer/types/buildroot"
 )
@@ -25,6 +26,7 @@ type Blockchain struct {
 	logger   hclog.Logger
 	config   *chain.Chain
 	chaindb  ethdb.Database
+	state    *itrie.State
 	genesis  types.Hash
 	stream   *eventStream // Event subscriptions
 	executor Executor
@@ -61,10 +63,11 @@ type Executor interface {
 	Stop()
 }
 
-func NewBlockchain(logger hclog.Logger, db ethdb.Database, chain *chain.Chain, executor Executor) (*Blockchain, error) {
+func NewBlockchain(logger hclog.Logger, db ethdb.Database, chain *chain.Chain, executor Executor, state *itrie.State) (*Blockchain, error) {
 	b := &Blockchain{
 		logger:   logger.Named("blockchain"),
 		chaindb:  db,
+		state:    state,
 		config:   chain,
 		stream:   &eventStream{},
 		executor: executor,
