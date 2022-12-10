@@ -218,30 +218,27 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 	if err := b.writeBody(block); err != nil {
 		return err
 	}
-	// execute tx
-	if header.HasBody() {
 
-		blockResult, err := b.executeBlockTransactions(block)
-		if err != nil {
-			return err
-		}
+	blockResult, err := b.executeBlockTransactions(block)
+	if err != nil {
+		return err
+	}
 
-		if buildroot.CalculateReceiptsRoot(blockResult.Receipts) != header.ReceiptsRoot {
-			return fmt.Errorf("mismatch receipt root %s != %s", header.ReceiptsRoot, blockResult.Root)
-		}
+	if buildroot.CalculateReceiptsRoot(blockResult.Receipts) != header.ReceiptsRoot {
+		return fmt.Errorf("mismatch receipt root %s != %s", header.ReceiptsRoot, blockResult.Root)
+	}
 
-		if buildroot.CalculateTransactionsRoot(block.Transactions) != header.TxRoot {
-			return fmt.Errorf("mismatch receipt root %s != %s", header.ReceiptsRoot, blockResult.Root)
-		}
+	if buildroot.CalculateTransactionsRoot(block.Transactions) != header.TxRoot {
+		return fmt.Errorf("mismatch receipt root %s != %s", header.ReceiptsRoot, blockResult.Root)
+	}
 
-		if blockResult.Root != header.StateRoot {
-			return fmt.Errorf("mismatch state root %s != %s", header.StateRoot, blockResult.Root)
-		}
+	if blockResult.Root != header.StateRoot {
+		return fmt.Errorf("mismatch state root %s != %s", header.StateRoot, blockResult.Root)
+	}
 
-		err = rawdb.WrteReceipts(b.chaindb, blockResult.Receipts)
-		if err != nil {
-			return err
-		}
+	err = rawdb.WrteReceipts(b.chaindb, blockResult.Receipts)
+	if err != nil {
+		return err
 	}
 
 	// Write the header to the chain

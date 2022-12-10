@@ -30,6 +30,7 @@ func NewKVStorage(db ethdb.Database) Storage {
 	return &KVStorage{db}
 }
 func (kv *KVStorage) Set(k []byte, v []byte) error {
+
 	return kv.db.Set(ethdb.TrieDBI, k, v)
 }
 
