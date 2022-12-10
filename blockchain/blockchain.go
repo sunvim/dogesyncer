@@ -104,20 +104,25 @@ func (b *Blockchain) isStopped() bool {
 }
 
 func (b *Blockchain) SelfCheck() {
+	var newheader *types.Header
+
 	latest, _ := rawdb.ReadHeadHash(b.chaindb)
 	header, _ := rawdb.ReadHeader(b.chaindb, latest)
-	_, ok := rawdb.ReadCanonicalHash(b.chaindb, header.Number)
-	if !ok { // missing latest header
-		reset(b.chaindb)
-		return
+	_, exist := rawdb.ReadCanonicalHash(b.chaindb, header.Number)
+	if !exist { // missing latest header
+		newheader, _ = b.GetHeaderByNumber(header.Number - 1)
 	}
+
 	// issue: when restart , missing state
-	_, err := rawdb.ReadState(b.chaindb, header.StateRoot)
-	if err != nil {
-		reset(b.chaindb)
-		return
+	for index := header.Number; index > 0; index-- {
+		newheader, _ = b.GetHeaderByNumber(index)
+		_, err := rawdb.ReadState(b.chaindb, newheader.StateRoot)
+		if err == nil {
+			break
+		}
 	}
-	return
+	rawdb.WriteHeadHash(b.chaindb, newheader.Hash)
+	rawdb.WriteHeadNumber(b.chaindb, newheader.Number)
 }
 
 func (b *Blockchain) CurrentTD() *big.Int {

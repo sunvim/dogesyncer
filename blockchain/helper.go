@@ -2,8 +2,6 @@ package blockchain
 
 import (
 	"github.com/sunvim/dogesyncer/crypto"
-	"github.com/sunvim/dogesyncer/ethdb"
-	"github.com/sunvim/dogesyncer/rawdb"
 	"github.com/sunvim/dogesyncer/types"
 )
 
@@ -25,12 +23,4 @@ func ecrecoverFromHeader(h *types.Header) (types.Address, error) {
 	}
 
 	return crypto.PubKeyToAddress(pub), nil
-}
-
-func reset(db ethdb.Database) {
-	latestHash, _ := rawdb.ReadHeadHash(db)
-	header, _ := rawdb.ReadHeader(db, latestHash)
-	lastHeader, _ := rawdb.ReadHeader(db, header.ParentHash)
-	rawdb.WriteHeadHash(db, lastHeader.Hash)
-	rawdb.WriteHeadNumber(db, lastHeader.Number)
 }
