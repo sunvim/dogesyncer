@@ -111,6 +111,12 @@ func (b *Blockchain) SelfCheck() {
 		reset(b.chaindb)
 		return
 	}
+	// issue: when restart , missing state
+	_, err := rawdb.ReadState(b.chaindb, header.StateRoot)
+	if err != nil {
+		reset(b.chaindb)
+		return
+	}
 	return
 }
 
