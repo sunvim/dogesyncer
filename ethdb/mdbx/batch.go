@@ -49,7 +49,6 @@ func (b *KVBatch) Write() error {
 
 	defer func() {
 		tx.Commit()
-		b.env.Sync(true, false)
 	}()
 
 	for _, keyvalue := range b.writes {

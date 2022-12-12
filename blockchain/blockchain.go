@@ -247,9 +247,6 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 		return err
 	}
 
-	// write all data to database
-	// b.chaindb.Sync()
-
 	// Update the average gas price
 	b.updateGasPriceAvgWithBlock(block)
 
