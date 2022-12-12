@@ -26,7 +26,7 @@ type MdbxDB struct {
 	path     string
 	env      *mdbx.Env
 	cache    *hashmap.Map[string, *NewValue]
-	delcache *hashmap.Map[string, struct{}]
+	delcache *hashmap.Map[string, *NewValue]
 	dbi      map[string]mdbx.DBI
 }
 
@@ -135,7 +135,7 @@ func NewMDBX(path string) *MdbxDB {
 	})
 
 	d.cache = hashmap.New[string, *NewValue]()
-	d.delcache = hashmap.New[string, struct{}]()
+	d.delcache = hashmap.New[string, *NewValue]()
 	go d.syncPeriod()
 	return d
 }
@@ -146,7 +146,7 @@ func (d *MdbxDB) syncCache() {
 
 	d.cache.Range(func(s string, nv *NewValue) bool {
 		b.Set(nv.Dbi, nv.Key, nv.Val)
-		d.delcache.Set(s, struct{}{})
+		d.delcache.Set(s, nv)
 		return true
 	})
 
@@ -155,9 +155,10 @@ func (d *MdbxDB) syncCache() {
 		panic(err)
 	}
 
-	d.delcache.Range(func(key string, _ struct{}) bool {
+	d.delcache.Range(func(key string, nv *NewValue) bool {
 		d.cache.Del(key)
 		d.delcache.Del(key)
+		nvpool.Put(nv)
 		return true
 	})
 
