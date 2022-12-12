@@ -1,17 +1,47 @@
 package mdbx
 
 import (
+	"bytes"
+	"sync"
+	"time"
+
+	"github.com/cornelk/hashmap"
 	"github.com/sunvim/dogesyncer/ethdb"
 	"github.com/torquem-ch/mdbx-go/mdbx"
 )
 
+type NewValue struct {
+	Dbi string
+	Key []byte
+	Val []byte
+}
+
+func (nv *NewValue) Reset() {
+	nv.Dbi = ""
+	nv.Key = nil
+	nv.Val = nil
+}
+
 type MdbxDB struct {
-	path string
-	env  *mdbx.Env
-	dbi  map[string]mdbx.DBI
+	path  string
+	env   *mdbx.Env
+	cache *hashmap.Map[string, *NewValue]
+	dbi   map[string]mdbx.DBI
 }
 
 var (
+	nvpool = sync.Pool{
+		New: func() any {
+			return &NewValue{}
+		},
+	}
+
+	strbuf = sync.Pool{
+		New: func() any {
+			return bytes.NewBuffer([]byte{})
+		},
+	}
+
 	defaultFlags = mdbx.Durable | mdbx.NoReadahead | mdbx.Coalesce
 
 	dbis = []string{
@@ -103,5 +133,27 @@ func NewMDBX(path string) *MdbxDB {
 
 	})
 
+	d.cache = hashmap.New[string, *NewValue]()
+	go d.syncPeriod()
 	return d
+}
+
+func (d *MdbxDB) syncCache() {
+	b := d.Batch()
+	d.cache.Range(func(s string, nv *NewValue) bool {
+		b.Set(nv.Dbi, nv.Key, nv.Val)
+		d.cache.Del(s)
+		return true
+	})
+	err := b.Write()
+	if err != nil { // shouldn't miss data, so panic
+		panic(err)
+	}
+}
+
+func (d *MdbxDB) syncPeriod() {
+	tick := time.Tick(30 * time.Second)
+	for range tick {
+		d.syncCache()
+	}
 }

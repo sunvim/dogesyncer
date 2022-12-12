@@ -1,21 +1,42 @@
 package mdbx
 
 import (
+	"bytes"
+
 	"github.com/sunvim/dogesyncer/ethdb"
 	"github.com/torquem-ch/mdbx-go/mdbx"
 )
 
 func (d *MdbxDB) Set(dbi string, k []byte, v []byte) error {
 
-	d.env.Update(func(txn *mdbx.Txn) error {
-		txn.Put(d.dbi[dbi], k, v, mdbx.Upsert)
-		return nil
-	})
+	nv := nvpool.Get().(*NewValue)
+	nv.Reset()
+	nv.Dbi = dbi
+	nv.Key = k
+	nv.Val = v
+
+	buf := strbuf.Get().(*bytes.Buffer)
+	buf.Reset()
+	buf.WriteString(dbi)
+	buf.Write(k)
+	d.cache.Set(buf.String(), nv)
+	strbuf.Put(buf)
 
 	return nil
 }
 
 func (d *MdbxDB) Get(dbi string, k []byte) ([]byte, bool, error) {
+
+	buf := strbuf.Get().(*bytes.Buffer)
+	buf.Reset()
+	buf.WriteString(dbi)
+	buf.Write(k)
+
+	nv, ok := d.cache.Get(buf.String())
+	if ok {
+		return nv.Val, true, nil
+	}
+
 	var (
 		v []byte
 		r bool
@@ -49,6 +70,9 @@ func (d *MdbxDB) Sync() error {
 }
 
 func (d *MdbxDB) Close() error {
+
+	d.syncCache()
+
 	d.env.Sync(true, false)
 	for _, dbi := range d.dbi {
 		d.env.CloseDBI(dbi)
