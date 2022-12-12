@@ -12,7 +12,7 @@ import (
 type RpcFunc func(method string, params ...any) any
 
 type Request struct {
-	Version string `json:"jsonrpc"`
+	Version string `json:"jsonrpc,omitempty"`
 	Method  string `json:"method"`
 	Params  []any  `json:"params"`
 	ID      any    `json:"id"`
