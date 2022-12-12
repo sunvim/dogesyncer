@@ -654,10 +654,9 @@ func (b *Blockchain) ChainDB() ethdb.Database {
 
 func (b *Blockchain) HandleGenesis() error {
 
-	b.SelfCheck()
-
 	head, ok := rawdb.ReadHeadHash(b.chaindb)
 	if ok { // non empty storage
+		b.SelfCheck()
 		genesis, ok := rawdb.ReadCanonicalHash(b.chaindb, 0)
 		if !ok {
 			return fmt.Errorf("failed to load genesis hash")
