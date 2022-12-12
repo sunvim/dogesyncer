@@ -23,10 +23,11 @@ func (nv *NewValue) Reset() {
 }
 
 type MdbxDB struct {
-	path  string
-	env   *mdbx.Env
-	cache *hashmap.Map[string, *NewValue]
-	dbi   map[string]mdbx.DBI
+	path     string
+	env      *mdbx.Env
+	cache    *hashmap.Map[string, *NewValue]
+	delcache *hashmap.Map[string, struct{}]
+	dbi      map[string]mdbx.DBI
 }
 
 var (
@@ -134,25 +135,36 @@ func NewMDBX(path string) *MdbxDB {
 	})
 
 	d.cache = hashmap.New[string, *NewValue]()
+	d.delcache = hashmap.New[string, struct{}]()
 	go d.syncPeriod()
 	return d
 }
 
 func (d *MdbxDB) syncCache() {
+
 	b := d.Batch()
+
 	d.cache.Range(func(s string, nv *NewValue) bool {
 		b.Set(nv.Dbi, nv.Key, nv.Val)
-		d.cache.Del(s)
+		d.delcache.Set(s, struct{}{})
 		return true
 	})
+
 	err := b.Write()
 	if err != nil { // shouldn't miss data, so panic
 		panic(err)
 	}
+
+	d.delcache.Range(func(key string, _ struct{}) bool {
+		d.cache.Del(key)
+		d.delcache.Del(key)
+		return true
+	})
+
 }
 
 func (d *MdbxDB) syncPeriod() {
-	tick := time.Tick(30 * time.Second)
+	tick := time.Tick(3 * time.Second)
 	for range tick {
 		d.syncCache()
 	}
