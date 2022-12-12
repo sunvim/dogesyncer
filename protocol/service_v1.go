@@ -120,7 +120,10 @@ func (s *serviceV1) GetObjectsByHash(_ context.Context, req *proto.HashRequest) 
 	return resp, nil
 }
 
-const maxSkeletonHeadersAmount = 300
+const (
+	maxSkeletonHeadersAmount  = 300
+	stepSkeletonHeadersAmount = 100
+)
 
 // GetHeaders implements the V1Server interface
 func (s *serviceV1) GetHeaders(_ context.Context, req *proto.GetHeadersRequest) (*proto.Response, error) {

@@ -381,10 +381,7 @@ func (s *Syncer) SyncWork(ctx context.Context) {
 			}
 
 			// increase block amount when succeeded
-			blockAmount++
-			if blockAmount > maxSkeletonHeadersAmount {
-				blockAmount = maxSkeletonHeadersAmount
-			}
+			blockAmount += stepSkeletonHeadersAmount
 
 			// Verify and write the data locally
 			for _, block := range sk.blocks {
