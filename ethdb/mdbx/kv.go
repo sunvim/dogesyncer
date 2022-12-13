@@ -9,8 +9,7 @@ import (
 
 func (d *MdbxDB) Set(dbi string, k []byte, v []byte) error {
 
-	nv := nvpool.Get().(*NewValue)
-	nv.Reset()
+	nv := &NewValue{}
 	nv.Dbi = dbi
 	nv.Key = k
 	nv.Val = v
@@ -19,7 +18,7 @@ func (d *MdbxDB) Set(dbi string, k []byte, v []byte) error {
 	buf.Reset()
 	buf.WriteString(dbi)
 	buf.Write(k)
-	d.cache.Set(buf.String(), nv)
+	d.cache.Add(buf.String(), nv)
 	strbuf.Put(buf)
 
 	return nil
@@ -70,8 +69,13 @@ func (d *MdbxDB) Sync() error {
 }
 
 func (d *MdbxDB) Close() error {
-
-	d.syncCache()
+	// flush cache data to database
+	keys := d.cache.Keys()
+	for _, key := range keys {
+		nv, _ := d.cache.Get(key)
+		d.batch.Set(nv.Dbi, nv.Key, nv.Val)
+	}
+	d.batch.Write()
 
 	d.env.Sync(true, false)
 	for _, dbi := range d.dbi {

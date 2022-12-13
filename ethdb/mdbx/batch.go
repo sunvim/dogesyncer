@@ -17,7 +17,6 @@ type KVBatch struct {
 	env    *mdbx.Env
 	dbi    map[string]mdbx.DBI
 	writes []keyvalue
-	size   int
 }
 
 func copyBytes(b []byte) (copiedBytes []byte) {
@@ -32,7 +31,6 @@ func copyBytes(b []byte) (copiedBytes []byte) {
 
 func (b *KVBatch) Set(dbi string, k, v []byte) error {
 	b.writes = append(b.writes, keyvalue{dbi, copyBytes(k), copyBytes(v)})
-	b.size += len(k) + len(v)
 	return nil
 }
 

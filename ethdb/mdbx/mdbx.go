@@ -3,9 +3,8 @@ package mdbx
 import (
 	"bytes"
 	"sync"
-	"time"
 
-	"github.com/cornelk/hashmap"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/sunvim/dogesyncer/ethdb"
 	"github.com/torquem-ch/mdbx-go/mdbx"
 )
@@ -23,11 +22,12 @@ func (nv *NewValue) Reset() {
 }
 
 type MdbxDB struct {
-	path     string
-	env      *mdbx.Env
-	cache    *hashmap.Map[string, *NewValue]
-	delcache *hashmap.Map[string, *NewValue]
-	dbi      map[string]mdbx.DBI
+	path  string
+	env   *mdbx.Env
+	cache *lru.Cache[string, *NewValue]
+	dbi   map[string]mdbx.DBI
+	batch ethdb.Batch
+	bsize uint64
 }
 
 var (
@@ -58,6 +58,10 @@ var (
 		ethdb.QueueDBI,
 		ethdb.CodeDBI,
 	}
+)
+
+const (
+	cacheSize = 10240
 )
 
 func NewMDBX(path string) *MdbxDB {
@@ -133,40 +137,22 @@ func NewMDBX(path string) *MdbxDB {
 		return nil
 
 	})
+	d.batch = d.Batch()
+	var ce error
+	d.cache, ce = lru.NewWithEvict(cacheSize, func(key string, value *NewValue) {
+		d.bsize++
+		d.batch.Set(value.Dbi, value.Key, value.Val)
+		if d.bsize%cacheSize == 0 {
+			err := d.batch.Write()
+			if err != nil {
+				panic(err) // shouldn't miss data
+			}
+			d.batch = d.Batch()
+		}
+	})
+	if ce != nil {
+		panic(ce)
+	}
 
-	d.cache = hashmap.New[string, *NewValue]()
-	d.delcache = hashmap.New[string, *NewValue]()
-	go d.syncPeriod()
 	return d
-}
-
-func (d *MdbxDB) syncCache() {
-
-	b := d.Batch()
-
-	d.cache.Range(func(s string, nv *NewValue) bool {
-		b.Set(nv.Dbi, nv.Key, nv.Val)
-		d.delcache.Set(s, nv)
-		return true
-	})
-
-	err := b.Write()
-	if err != nil { // shouldn't miss data, so panic
-		panic(err)
-	}
-
-	d.delcache.Range(func(key string, nv *NewValue) bool {
-		d.cache.Del(key)
-		d.delcache.Del(key)
-		nvpool.Put(nv)
-		return true
-	})
-
-}
-
-func (d *MdbxDB) syncPeriod() {
-	tick := time.Tick(3 * time.Second)
-	for range tick {
-		d.syncCache()
-	}
 }
