@@ -332,7 +332,6 @@ func (s *Syncer) SyncWork(ctx context.Context) {
 
 		// return error
 		if err != nil {
-			s.logger.Error("find peer", "err", err)
 			continue
 		}
 
