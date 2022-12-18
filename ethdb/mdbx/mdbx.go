@@ -170,10 +170,11 @@ func NewMDBX(path string, logger hclog.Logger) *MdbxDB {
 	return d
 }
 
-func (d *MdbxDB) flush() {
+func (d *MdbxDB) flush(all bool) {
 	var (
 		info  *mdbx.EnvInfo
 		count uint64
+		err   error
 	)
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -184,7 +185,13 @@ func (d *MdbxDB) flush() {
 		keys := d.cache.Keys()
 		for _, key := range keys {
 			nv, _ := d.cache.Get(key)
-			err := txn.Put(d.dbi[nv.Dbi], nv.Key, nv.Val, 0)
+			if !all {
+				_, err = txn.Get(d.dbi[nv.Dbi], nv.Key)
+				if err == nil {
+					continue
+				}
+			}
+			err = txn.Put(d.dbi[nv.Dbi], nv.Key, nv.Val, 0)
 			if err != nil {
 				panic(err)
 			}
@@ -215,8 +222,8 @@ func (d *MdbxDB) synccache() {
 			return
 		case <-d.syncCh:
 			cnt++
-			if cnt%512 == 0 {
-				d.flush()
+			if cnt%5120 == 0 {
+				d.flush(false)
 			}
 		}
 	}
