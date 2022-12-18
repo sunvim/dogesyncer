@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/cornelk/hashmap"
@@ -751,23 +750,24 @@ func (s *Server) SubscribeFn(handler func(evnt *peerEvent.PeerEvent)) error {
 func (s *Server) SubscribeCh() (<-chan *peerEvent.PeerEvent, error) {
 	ch := make(chan *peerEvent.PeerEvent)
 
-	var isClosed int32 = 0
+	closeCh := make(chan struct{})
 
 	err := s.SubscribeFn(func(evnt *peerEvent.PeerEvent) {
-		if atomic.LoadInt32(&isClosed) == 0 {
+		select {
+		default:
 			ch <- evnt
+		case <-closeCh:
+			return
 		}
 	})
 	if err != nil {
-		atomic.StoreInt32(&isClosed, 1)
 		close(ch)
-
 		return nil, err
 	}
 
 	go func() {
 		<-s.closeCh
-		atomic.StoreInt32(&isClosed, 1)
+		close(closeCh)
 		close(ch)
 	}()
 
