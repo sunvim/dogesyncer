@@ -128,8 +128,8 @@ func NewMDBX(path string, logger hclog.Logger) *MdbxDB {
 	}
 	d.env = env
 
-	d.acache = New(1 << 28)
-	d.bcache = New(1 << 24)
+	d.acache = New(1 << 24)
+	d.bcache = New(1 << 28)
 
 	env.Update(func(txn *mdbx.Txn) error {
 		// create or open all dbi
