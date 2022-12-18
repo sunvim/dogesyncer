@@ -12,7 +12,7 @@ import (
 )
 
 func ReadTD(db ethdb.Database, hash types.Hash) (*big.Int, bool) {
-	v, ok, err := db.Get(ethdb.TDDBI, hash[:])
+	v, ok, err := db.Get(ethdb.TODBI, hash[:])
 	if err != nil || !ok {
 		return nil, false
 	}
@@ -23,7 +23,7 @@ func ReadTD(db ethdb.Database, hash types.Hash) (*big.Int, bool) {
 }
 
 func WriteTD(db ethdb.Database, hash types.Hash, number uint64) error {
-	return db.Set(ethdb.TDDBI, hash[:], helper.EncodeVarint(number))
+	return db.Set(ethdb.TODBI, hash[:], helper.EncodeVarint(number))
 }
 
 func ReadHeadNumber(db ethdb.Database) (uint64, bool) {

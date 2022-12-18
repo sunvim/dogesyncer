@@ -45,16 +45,14 @@ func (b *KVBatch) Write() error {
 		panic(err)
 	}
 
-	defer func() {
-		tx.Commit()
-	}()
-
 	for _, keyvalue := range b.writes {
 		err = tx.Put(b.dbi[keyvalue.dbi], keyvalue.key, keyvalue.value, 0)
 		if err != nil {
 			panic(err)
 		}
 	}
+
+	tx.Commit()
 
 	return nil
 }

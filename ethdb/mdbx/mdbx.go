@@ -3,9 +3,12 @@ package mdbx
 import (
 	"bytes"
 	"sync"
+	"time"
 
+	"github.com/hashicorp/go-hclog"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/sunvim/dogesyncer/ethdb"
+	"github.com/sunvim/dogesyncer/helper"
 	"github.com/torquem-ch/mdbx-go/mdbx"
 )
 
@@ -15,19 +18,17 @@ type NewValue struct {
 	Val []byte
 }
 
-func (nv *NewValue) Reset() {
-	nv.Dbi = ""
-	nv.Key = nil
-	nv.Val = nil
-}
-
 type MdbxDB struct {
-	path  string
-	env   *mdbx.Env
-	cache *lru.Cache[string, *NewValue]
-	dbi   map[string]mdbx.DBI
-	batch ethdb.Batch
-	bsize uint64
+	logger hclog.Logger
+	mu     sync.Mutex
+	path   string
+	env    *mdbx.Env
+	cache  *lru.Cache[string, *NewValue]
+	acache *MemDB
+	bcache *MemDB
+	syncCh chan struct{}
+	dbi    map[string]mdbx.DBI
+	stopCh chan struct{}
 }
 
 var (
@@ -52,10 +53,9 @@ var (
 		ethdb.NumHashDBI,
 		ethdb.TxesDBI,
 		ethdb.HeadDBI,
-		ethdb.TDDBI,
+		ethdb.TODBI,
 		ethdb.ReceiptsDBI,
 		ethdb.SnapDBI,
-		ethdb.QueueDBI,
 		ethdb.CodeDBI,
 	}
 )
@@ -64,7 +64,7 @@ const (
 	cacheSize = 10240
 )
 
-func NewMDBX(path string) *MdbxDB {
+func NewMDBX(path string, logger hclog.Logger) *MdbxDB {
 
 	env, err := mdbx.NewEnv()
 	if err != nil {
@@ -120,10 +120,16 @@ func NewMDBX(path string) *MdbxDB {
 	}
 
 	d := &MdbxDB{
-		path: path,
-		dbi:  make(map[string]mdbx.DBI),
+		logger: logger,
+		path:   path,
+		dbi:    make(map[string]mdbx.DBI),
+		syncCh: make(chan struct{}, 10240),
+		stopCh: make(chan struct{}),
 	}
 	d.env = env
+
+	d.acache = New(1 << 28)
+	d.bcache = New(1 << 24)
 
 	env.Update(func(txn *mdbx.Txn) error {
 		// create or open all dbi
@@ -137,22 +143,81 @@ func NewMDBX(path string) *MdbxDB {
 		return nil
 
 	})
-	d.batch = d.Batch()
 	var ce error
 	d.cache, ce = lru.NewWithEvict(cacheSize, func(key string, value *NewValue) {
-		d.bsize++
-		d.batch.Set(value.Dbi, value.Key, value.Val)
-		if d.bsize%cacheSize == 0 {
-			err := d.batch.Write()
-			if err != nil {
-				panic(err) // shouldn't miss data
+		if d.mu.TryLock() {
+			d.bcache.Put(helper.S2B(key), value.Val)
+			if d.acache.Size() != 0 {
+				iter := d.acache.NewIterator()
+				for iter.Next() {
+					d.bcache.Put(iter.key, iter.value)
+				}
+				iter.Release()
+				d.acache.Reset()
 			}
-			d.batch = d.Batch()
+			d.mu.Unlock()
+		} else {
+			d.acache.Put(helper.S2B(key), value.Val)
 		}
+		d.syncCh <- struct{}{}
 	})
 	if ce != nil {
 		panic(ce)
 	}
 
+	go d.synccache()
+
 	return d
+}
+
+func (d *MdbxDB) flush() {
+	var (
+		info  *mdbx.EnvInfo
+		count uint64
+	)
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	stx := time.Now()
+	d.env.Update(func(txn *mdbx.Txn) error {
+		// flush lru cache
+		keys := d.cache.Keys()
+		for _, key := range keys {
+			nv, _ := d.cache.Get(key)
+			err := txn.Put(d.dbi[nv.Dbi], nv.Key, nv.Val, 0)
+			if err != nil {
+				panic(err)
+			}
+			count++
+		}
+		// flush bcache
+		iter := d.bcache.NewIterator()
+		for iter.Next() {
+			err := txn.Put(d.dbi[helper.B2S(iter.key[:4])], iter.key[4:], iter.value, 0)
+			if err != nil {
+				panic(err)
+			}
+			count++
+		}
+		iter.Release()
+		d.bcache.Reset()
+		info, _ = d.env.Info(txn)
+		return nil
+	})
+	d.logger.Info("flush", "keys", count, "elapse", time.Since(stx), "readers", info.NumReaders, "sync since", info.SinceSync)
+}
+
+func (d *MdbxDB) synccache() {
+	var cnt uint64
+	for {
+		select {
+		case <-d.stopCh:
+			return
+		case <-d.syncCh:
+			cnt++
+			if cnt%512 == 0 {
+				d.flush()
+			}
+		}
+	}
 }
