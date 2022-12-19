@@ -58,6 +58,7 @@ var (
 		ethdb.ReceiptsDBI,
 		ethdb.SnapDBI,
 		ethdb.CodeDBI,
+		ethdb.TxLookUpDBI,
 	}
 )
 

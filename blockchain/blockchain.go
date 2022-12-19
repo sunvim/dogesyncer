@@ -547,7 +547,23 @@ func (b *Blockchain) getSigner(height uint64) crypto.TxSigner {
 // writeBody writes the block body to the DB.
 // Additionally, it also updates the txn lookup, for txnHash -> block lookups
 func (b *Blockchain) writeBody(block *types.Block) error {
-	return rawdb.WriteTransactions(b.chaindb, block.Transactions)
+
+	err := rawdb.WriteTransactions(b.chaindb, block.Transactions)
+	if err != nil {
+		return err
+	}
+
+	err = rawdb.WriteBody(b.chaindb, block.Hash(), block.Transactions)
+	if err != nil {
+		return err
+	}
+
+	err = rawdb.WriteTxLookUp(b.chaindb, block.Number(), block.Transactions)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (b *Blockchain) VerifyFinalizedBlock(block *types.Block) error {

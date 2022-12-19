@@ -9,6 +9,7 @@ var (
 	AssistDBI   = "assi"
 	NumHashDBI  = "nuha"
 	TxesDBI     = "txes"
+	TxLookUpDBI = "lkup"
 	ReceiptsDBI = "rept"
 	TODBI       = "todi" // total difficulty
 	SnapDBI     = "snap" // consensus snapshot
