@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"os"
 	"sync"
 	"time"
 
@@ -286,22 +285,12 @@ func (s *Syncer) WatchSync(ctx context.Context) {
 				continue
 			}
 			newblock = items[0]
-
-			if err = s.blockchain.VerifyFinalizedBlock(newblock); err != nil {
-				if err == blockchain.ErrExistBlock {
-					continue
-				}
-				s.logger.Error("verify block", "err", err)
-				os.Exit(1)
-			}
 			stx := time.Now()
 			err = s.blockchain.WriteBlock(newblock)
 			if err != nil {
 				s.logger.Error("handle new block", "err", err)
-				os.Exit(1)
 			}
 			s.logger.Info("write block", "time", time.Since(stx))
-
 		}
 	}
 }
