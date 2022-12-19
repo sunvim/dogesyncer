@@ -84,7 +84,7 @@ func (d *MdbxDB) Sync() error {
 func (d *MdbxDB) Close() error {
 	close(d.stopCh)
 
-	d.flush()
+	d.flush(true)
 
 	// flush cache data to database
 	d.env.Update(func(txn *mdbx.Txn) error {

@@ -171,7 +171,7 @@ func NewMDBX(path string, logger hclog.Logger) *MdbxDB {
 	return d
 }
 
-func (d *MdbxDB) flush() {
+func (d *MdbxDB) flush(allFlush bool) {
 	var (
 		info  *mdbx.EnvInfo
 		count uint64
@@ -194,9 +194,11 @@ func (d *MdbxDB) flush() {
 			}
 
 			// if key exists, then skip
-			_, err = txn.Get(d.dbi[nv.Dbi], nv.Key)
-			if err == nil {
-				continue
+			if !allFlush {
+				_, err = txn.Get(d.dbi[nv.Dbi], nv.Key)
+				if err == nil {
+					continue
+				}
 			}
 
 			err = txn.Put(d.dbi[nv.Dbi], nv.Key, nv.Val, 0)
@@ -232,7 +234,7 @@ func (d *MdbxDB) synccache() {
 		case <-d.syncCh:
 			atomic.AddUint64(&cnt, 1)
 			if cnt%5120 == 0 {
-				d.flush()
+				d.flush(false)
 			}
 		}
 	}

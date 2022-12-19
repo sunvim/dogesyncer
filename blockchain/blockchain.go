@@ -106,11 +106,22 @@ func (b *Blockchain) isStopped() bool {
 func (b *Blockchain) SelfCheck() {
 	var newheader *types.Header
 
-	latest, _ := rawdb.ReadHeadHash(b.chaindb)
-	header, _ := rawdb.ReadHeader(b.chaindb, latest)
+	latest, ok := rawdb.ReadHeadHash(b.chaindb)
+	if !ok {
+		panic("it shouldn't happen, can't read latest hash")
+	}
+	header, err := rawdb.ReadHeader(b.chaindb, latest)
+	if err != nil {
+		panic("it shouldn't happen, can't read header by specify hash")
+	}
 	_, exist := rawdb.ReadCanonicalHash(b.chaindb, header.Number)
 	if !exist { // missing latest header
-		newheader, _ = b.GetHeaderByNumber(header.Number - 1)
+		for num := header.Number - 1; num > 0; num-- {
+			newheader, ok = b.GetHeaderByNumber(num)
+			if ok {
+				break
+			}
+		}
 	}
 
 	// issue: when restart , missing state
