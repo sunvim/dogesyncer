@@ -289,6 +289,7 @@ func (s *Syncer) WatchSync(ctx context.Context) {
 			err = s.blockchain.WriteBlock(newblock)
 			if err != nil {
 				s.logger.Error("handle new block", "err", err)
+				return
 			}
 			s.logger.Info("write block", "time", time.Since(stx))
 		}
