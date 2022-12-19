@@ -175,6 +175,8 @@ func (d *MdbxDB) flush() {
 		info  *mdbx.EnvInfo
 		count uint64
 		err   error
+		nv    *NewValue
+		ok    bool
 	)
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -184,11 +186,17 @@ func (d *MdbxDB) flush() {
 		// flush lru cache
 		keys := d.cache.Keys()
 		for _, key := range keys {
-			nv, _ := d.cache.Get(key)
+
+			nv, ok = d.cache.Get(key)
+			if !ok {
+				continue
+			}
+
 			err = txn.Put(d.dbi[nv.Dbi], nv.Key, nv.Val, 0)
 			if err != nil {
 				panic(err)
 			}
+
 			count++
 		}
 		// flush bcache

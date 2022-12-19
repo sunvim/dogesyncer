@@ -109,7 +109,7 @@ func (d *MdbxDB) Close() error {
 }
 
 func (d *MdbxDB) Batch() ethdb.Batch {
-	return &KVBatch{env: d.env, dbi: d.dbi}
+	return &KVBatch{db: d}
 }
 
 func (d *MdbxDB) Remove(dbi string, k []byte) error {
