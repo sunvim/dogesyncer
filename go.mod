@@ -8,6 +8,7 @@ require (
 	github.com/bytedance/sonic v1.5.0
 	github.com/cornelk/hashmap v1.0.8
 	github.com/dogechain-lab/fastrlp v0.0.0-20220523073019-b0c60fc6bb7a
+	github.com/gammazero/workerpool v1.1.3
 	github.com/go-kit/kit v0.12.0
 	github.com/gofiber/fiber/v2 v2.39.0
 	github.com/golang/protobuf v1.5.2
@@ -59,6 +60,7 @@ require (
 	github.com/flynn/noise v1.0.0 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
+	github.com/gammazero/deque v0.2.0 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
