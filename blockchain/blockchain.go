@@ -91,7 +91,6 @@ func (b *Blockchain) Close() error {
 	b.executor.Stop()
 	b.stop()
 	b.wg.Wait()
-
 	return b.chaindb.Close()
 }
 

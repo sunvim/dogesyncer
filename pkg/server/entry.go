@@ -22,14 +22,16 @@ func Run(cmd *cobra.Command, args []string) {
 		panic(err)
 	}
 
-	svc.Register(m.Close)
-
 	m.logger.Info("start to syncer")
 	syncer := protocol.NewSyncer(m.logger, m.network, m.blockchain, serverConfig.DataDir)
 	syncer.Start(ctx)
 
 	rpcServer := rpc.NewRpcServer(m.logger, m.blockchain, serverConfig.RpcAddr, serverConfig.RpcPort)
 	rpcServer.Start(ctx)
+
+	// register close function
+	svc.Register(syncer.Close)
+	svc.Register(m.Close)
 
 	m.logger.Info("server boot over...")
 	svc.Wait()
