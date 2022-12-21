@@ -16,12 +16,10 @@ type NewValue struct {
 }
 
 type MdbxDB struct {
-	logger  hclog.Logger
-	mu      sync.Mutex
-	flushMu sync.Mutex
-	path    string
-	env     *mdbx.Env
-	dbi     map[string]mdbx.DBI
+	logger hclog.Logger
+	path   string
+	env    *mdbx.Env
+	dbi    map[string]mdbx.DBI
 }
 
 var (
@@ -38,7 +36,7 @@ var (
 		},
 	}
 
-	defaultFlags = mdbx.Durable | mdbx.NoReadahead | mdbx.Coalesce | mdbx.WriteMap | mdbx.NoMetaSync
+	defaultFlags = mdbx.Durable | mdbx.NoReadahead | mdbx.Coalesce | mdbx.NoMetaSync
 
 	dbis = []string{
 		ethdb.BodyDBI,

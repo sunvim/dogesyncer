@@ -4,13 +4,22 @@ import (
 	"time"
 
 	"github.com/sunvim/dogesyncer/ethdb"
+	"github.com/sunvim/utils/cachem"
 	"github.com/torquem-ch/mdbx-go/mdbx"
 )
 
 func (d *MdbxDB) Set(dbi string, k []byte, v []byte) error {
-	return d.env.Update(func(txn *mdbx.Txn) error {
-		return txn.Put(d.dbi[dbi], k, v, 0)
+	key := copyBytes(k)
+	val := copyBytes(v)
+
+	err := d.env.Update(func(txn *mdbx.Txn) error {
+		return txn.Put(d.dbi[dbi], key, val, 0)
 	})
+
+	cachem.Free(key)
+	cachem.Free(val)
+
+	return err
 }
 
 func (d *MdbxDB) Get(dbi string, k []byte) ([]byte, bool, error) {
