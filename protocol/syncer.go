@@ -315,17 +315,7 @@ func (s *Syncer) SyncWork(ctx context.Context) {
 		ancestor *types.Header
 		err      error
 		blockCh  = make(chan []*types.Block, 4096)
-		block    *types.Block
 	)
-
-	go func(ctx context.Context) {
-		for blocks := range blockCh {
-			for _, block = range blocks {
-				s.enqueue.Put(block)
-				s.enqueueCh.In <- struct{}{}
-			}
-		}
-	}(ctx)
 
 	for {
 		select {
@@ -389,7 +379,14 @@ func (s *Syncer) SyncWork(ctx context.Context) {
 				}
 				blockAmount = maxSkeletonHeadersAmount
 
-				blockCh <- blocks
+				for _, block := range blocks {
+					err = s.blockchain.WriteBlock(block)
+					if err != nil {
+						s.logger.Error("write block", "err", err)
+						return
+					}
+				}
+
 				currentSyncHeight += uint64(len(blocks))
 
 				// check again
