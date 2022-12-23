@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"sync"
 
-	"github.com/gammazero/workerpool"
 	"github.com/hashicorp/go-hclog"
 	"github.com/sunvim/dogesyncer/ethdb"
 	"github.com/torquem-ch/mdbx-go/mdbx"
@@ -22,9 +21,6 @@ type MdbxDB struct {
 	path   string
 	env    *mdbx.Env
 	dbi    map[string]mdbx.DBI
-	mcache *MemDB
-	fcache *MemDB // frozen cache
-	worker *workerpool.WorkerPool
 }
 
 var (
@@ -85,10 +81,8 @@ func NewMDBX(path string, logger hclog.Logger) *MdbxDB {
 		logger: logger,
 		path:   path,
 		dbi:    make(map[string]mdbx.DBI),
-		worker: workerpool.New(1),
 	}
 	d.env = env
-	d.mcache = cachePool.Get().(*MemDB)
 
 	env.Update(func(txn *mdbx.Txn) error {
 		// create or open all dbi

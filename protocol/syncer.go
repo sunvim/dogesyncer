@@ -371,10 +371,11 @@ func (s *Syncer) SyncWork(ctx context.Context) {
 			blockAmount := maxSkeletonHeadersAmount
 			for {
 				sk := &skeleton{
+					server: s.server,
 					amount: int64(blockAmount),
 				}
 
-				err = sk.getBlocksFromPeer(p.client, currentSyncHeight)
+				blocks, err := sk.GetBlocks(ctx, p.ID(), currentSyncHeight)
 				if err != nil {
 					if rpcErr, ok := grpcstatus.FromError(err); ok {
 						// the data size exceeds grpc server/client message size
@@ -388,8 +389,8 @@ func (s *Syncer) SyncWork(ctx context.Context) {
 				}
 				blockAmount = maxSkeletonHeadersAmount
 
-				blockCh <- sk.blocks
-				currentSyncHeight += uint64(len(sk.blocks))
+				blockCh <- blocks
+				currentSyncHeight += uint64(len(blocks))
 
 				// check again
 				if currentSyncHeight >= target {
