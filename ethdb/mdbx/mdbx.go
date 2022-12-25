@@ -69,7 +69,7 @@ func NewMDBX(path string, logger hclog.Logger) *MdbxDB {
 		panic(err)
 	}
 
-	if err := env.SetGeometry(-1, -1, 1<<43, 1<<30, 1<<31, 1<<14); err != nil {
+	if err := env.SetGeometry(-1, -1, 1<<31, 1<<23, 1<<24, 1<<14); err != nil {
 		panic(err)
 	}
 
